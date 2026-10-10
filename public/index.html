@@ -256,6 +256,21 @@
       </aside>
     </main>
 
+    <dialog id="welcome" aria-labelledby="welcome-title" aria-describedby="welcome-intro">
+      <div class="dialog-heading"><h2 id="welcome-title">Sismos cerca de ti</h2></div>
+      <p id="welcome-intro">Instala la app y activa los avisos para seguir la actividad de tu zona.</p>
+      <section id="welcome-install-step" class="welcome-step">
+        <h3>1. Instala Sismos PMA</h3>
+        <p id="welcome-install-text" tabindex="-1"></p>
+        <button id="welcome-install" class="welcome-primary">Instalar app</button>
+      </section>
+      <section id="welcome-notify-step" class="welcome-step">
+        <h3>Activa los avisos</h3>
+        <p id="welcome-notify-text"></p>
+        <button id="welcome-notify" class="welcome-primary">Activar avisos</button>
+      </section>
+      <button id="welcome-later" class="welcome-later">Continuar al panel</button>
+    </dialog>
     <dialog id="activity-dialog">
       <div class="dialog-heading">
         <h2>Actividad en tu zona</h2>

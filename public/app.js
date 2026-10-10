@@ -3,7 +3,7 @@ import { PANAMA, HOUR, REFRESH_MS, SOURCE_LABELS, filterEvents, histogram, chang
 import { loadEarthquakes, readSettings, saveSettings } from './data.js';
 import { createEarthquakeMap } from './map.js';
 import { WAVE_SPEED, arrivalSeconds, surfaceRadiusKm } from './waves.js';
-import { notificationPermission, requestNotifications, showNotification, notifyNewRecords, onNotificationSelect, watchInstall, promptInstall, enablePush, updatePushFilters, disablePush } from './notify.js';
+import { notificationPermission, requestNotifications, showNotification, notifyNewRecords, onNotificationSelect, welcomeSetup, promptInstall, enablePush, updatePushFilters, disablePush } from './notify.js';
 
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -13,6 +13,8 @@ const state = { ...readSettings(), center: { ...PANAMA }, located: null, events:
 // Selected-event wave replay and whole-period timelapse share one animation loop.
 const player = { mode: 'waves', playing: !reducedMotion, speed: 4, t: 0, key: null, stage: null, raf: 0, last: 0, painted: 0,
   replay: { playing: false, duration: 60, t: 0, drawn: null, start: 0, end: 0, hours: 0, bins: [] } };
+let welcomeReady = false;
+const updateWelcome = welcomeSetup({ enabled: () => state.notify, activate: toggleNotify, ready: () => welcomeReady });
 const map = await createEarthquakeMap(selectEvent);
 const num = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
 const timeFormat = new Intl.DateTimeFormat('es-PA', { timeZone: 'America/Panama', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -571,9 +573,10 @@ $('min-mag').addEventListener('change', () => { state.minMag = Number($('min-mag
 $('source').addEventListener('change', () => { state.source = $('source').value; state.fitNext = true; notice(''); changedFilters(); });
 $('sort').addEventListener('change', () => { state.sort = $('sort').value; render(); });
 $('refresh').addEventListener('click', refresh);
-$('notify').addEventListener('click', toggleNotify);
+$('notify').addEventListener('click', async () => { await toggleNotify(); updateWelcome(); });
 $('install').addEventListener('click', promptInstall);
-watchInstall(available => { $('install').hidden = !available; });
+welcomeReady = true;
+updateWelcome();
 onNotificationSelect(id => selectEvent(id));
 $('fit-map').addEventListener('click', () => map.fit(state.visible, state.center));
 $('zoom-in').addEventListener('click', () => map.zoomBy(1));
