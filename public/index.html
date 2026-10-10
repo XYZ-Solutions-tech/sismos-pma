@@ -115,6 +115,7 @@
           <div class="legend-row">
             <span><i class="shape-key"></i>Geociencias UP</span
             ><span><i class="shape-key usgs"></i>USGS</span
+            ><span><i class="shape-key geoshake"></i>GeoShake</span
             ><span><i class="me-key"></i>Tú</span>
           </div>
           <div class="legend-row">
@@ -187,9 +188,10 @@
           <div class="filter-fields">
             <label>Fuente
               <select id="source">
-                <option value="all">Ambas</option>
+                <option value="all">Todas</option>
                 <option value="up">Geociencias UP</option>
                 <option value="usgs">USGS</option>
+                <option value="geoshake">GeoShake · en vivo</option>
               </select></label
             ><label>Radio
               <select id="radius">
@@ -214,6 +216,9 @@
           <summary>Estado de las fuentes</summary>
           <span id="source-up">Geociencias UP: consultando…</span
           ><span id="source-usgs">USGS: consultando…</span>
+          <span id="source-geoshake">GeoShake: consultando…</span>
+          <span id="geoshake-live">GeoShake: conectando al flujo en vivo…</span>
+          <p>GeoShake no garantiza avisos anticipados en Panamá. Sin magnitud publicada, sus eventos solo aparecen con «Todas» las magnitudes.</p>
           <p id="count-note">
             Un sismo puede tener un registro en cada fuente. Los conteos son registros, no sismos únicos.
           </p>
@@ -247,6 +252,7 @@
             <span id="updated" hidden>Esperando primera consulta</span>
             <p>Hora de Panamá (UTC−5). Las fuentes pueden publicar con retraso y revisar valores. Este panel no es una alerta temprana.</p>
             <div class="footnote-links">
+              <a href="https://map.geoshake.org" target="_blank" rel="noopener noreferrer">GeoShake · CC BY 4.0</a>
               <a href="https://earthquake.usgs.gov/earthquakes/map/" target="_blank" rel="noopener noreferrer">USGS</a
               ><a href="https://sismosgeociencias.up.ac.pa/" target="_blank" rel="noopener noreferrer">Geociencias UP</a
               ><span class="powered">Powered by: <a href="https://xyzsolutions.tech" target="_blank" rel="noopener noreferrer">xyzsolutions.tech</a></span>
@@ -286,6 +292,7 @@
             <strong id="last-hour">—</strong><span>sismos en la última hora</span>
           </div>
         </div>
+        <div id="energy-comparison" class="energy-comparison" aria-live="polite"></div>
         <div class="trend-rows" id="activity-trend" aria-live="polite"></div>
         <div class="chart-wrap">
           <div class="chart" id="chart" role="img" aria-label="Gráfica de frecuencia y energía"></div>

@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +9,7 @@ const root = new URL('./', import.meta.url);
 const port = Number(process.env.SISMOS_PORT || 8787);
 const routes = new Map([
   ['/', ['public/index.html', 'text/html']],
-  ...['styles.css', 'app.js', 'domain.js', 'data.js', 'map.js', 'leaflet-map.js', 'google-map.js', 'waves.js', 'overlay.js', 'notify.js', 'sw.js'].map(name => [`/${name}`, [`public/${name}`, name.endsWith('.css') ? 'text/css' : 'text/javascript']]),
+  ...['geoshake.js', 'styles.css', 'app.js', 'domain.js', 'data.js', 'map.js', 'leaflet-map.js', 'google-map.js', 'waves.js', 'overlay.js', 'notify.js', 'sw.js'].map(name => [`/${name}`, [`public/${name}`, name.endsWith('.css') ? 'text/css' : 'text/javascript']]),
   ['/manifest.webmanifest', ['public/manifest.webmanifest', 'application/manifest+json']],
   ...['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'].map(name => [`/${name}`, [`public/${name}`, 'image/png']]),
   ['/leaflet.js', ['node_modules/leaflet/dist/leaflet.js', 'text/javascript']],
@@ -35,6 +36,17 @@ const server = createServer(async (req, res) => {
         try { googleMapsKey = JSON.parse(await readFile(new URL('.runtime/google-maps.json', root), 'utf8')).googleMapsKey || null; } catch { /* Google is optional until configured. */ }
       }
       return json(res, 200, { googleMapsKey });
+    }
+    if (pathname === '/api/geoshake-live') {
+      const controller = new AbortController();
+      res.on('close', () => controller.abort());
+      const upstream = await fetch('https://api.geoshake.org/api/live', { signal: controller.signal });
+      if (!upstream.ok || !upstream.body) return json(res, 502, { error: 'GeoShake no disponible' });
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform' });
+      const stream = Readable.fromWeb(upstream.body);
+      stream.on('error', () => res.end());
+      stream.pipe(res);
+      return;
     }
     if (pathname === '/api/earthquakes') {
       return json(res, 200, await loadCatalogs());

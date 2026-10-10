@@ -3,9 +3,10 @@ import { WAVE_SPEED, arrivalSeconds } from './waves.js';
 export const PANAMA = { lat: 8.54, lon: -80.78, label: 'Panamá y alrededores' };
 export const HOUR = 3_600_000;
 export const REFRESH_MS = 30_000;
-export const SOURCE_LABELS = { up: 'Geociencias UP', usgs: 'USGS', all: 'Ambas fuentes' };
+export const SOURCE_LABELS = { up: 'Geociencias UP', usgs: 'USGS', geoshake: 'GeoShake', all: 'Todas las fuentes' };
 
 function eventURL(feature) {
+  if (feature.properties.source === 'geoshake') return 'https://map.geoshake.org';
   if (feature.properties.source === 'up') {
     try {
       const url = new URL(feature.properties.url);
@@ -29,7 +30,7 @@ export function normalize(features) {
     const p = feature.properties;
     const [lon, lat, depth] = feature.geometry?.coordinates || [];
     if (!p || p.type !== 'earthquake' || !feature.id || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180 || !Number.isFinite(p.time)) return [];
-    return [{ id: feature.id, source: p.source === 'up' ? 'up' : 'usgs', lat, lon, depth: Number.isFinite(depth) ? depth : null,
+    return [{ id: feature.id, source: ['up', 'geoshake'].includes(p.source) ? p.source : 'usgs', lat, lon, depth: Number.isFinite(depth) ? depth : null,
       mag: Number.isFinite(p.mag) ? p.mag : null, time: p.time, updated: p.updated,
       place: p.place || 'Ubicación sin descripción', magType: p.magType || '', status: p.status,
       felt: Number.isFinite(p.felt) ? p.felt : null, mmi: Number.isFinite(p.mmi) ? p.mmi : null,
@@ -78,7 +79,7 @@ export function displayPlace(place) {
 export function findTwin(event, events, maxSeconds = 20, maxKm = 80) {
   let best = null;
   for (const other of events) {
-    if (other.source === event.source || other.id === event.id) continue;
+    if (other.source === 'geoshake' || event.source === 'geoshake' || other.source === event.source || other.id === event.id) continue;
     const gap = Math.abs(other.time - event.time);
     if (gap > maxSeconds * 1000 || distanceKm(event, other) > maxKm) continue;
     if (!best || gap < Math.abs(best.time - event.time)) best = other;
@@ -92,7 +93,7 @@ export function twinIds(events, maxSeconds = 20, maxKm = 80) {
   const ids = new Set();
   for (let i = 0; i < sorted.length; i++) {
     for (let j = i + 1; j < sorted.length && sorted[j].time - sorted[i].time <= maxSeconds * 1000; j++) {
-      if (sorted[i].source === sorted[j].source || distanceKm(sorted[i], sorted[j]) > maxKm) continue;
+      if (sorted[i].source === 'geoshake' || sorted[j].source === 'geoshake' || sorted[i].source === sorted[j].source || distanceKm(sorted[i], sorted[j]) > maxKm) continue;
       ids.add(sorted[i].id);
       ids.add(sorted[j].id);
     }
@@ -118,6 +119,7 @@ export const energyJoules = mag => (mag === null ? 0 : 10 ** (1.5 * mag + 4.8));
 // One record per earthquake for sums and trends: a quake published by both catalogs counts once,
 // with the USGS record (twins always pair a UP record with a USGS one).
 export function uniqueEvents(events) {
+  events = events.filter(event => event.source !== 'geoshake');
   const twins = twinIds(events);
   return twins.size ? events.filter(event => !(event.source === 'up' && twins.has(event.id))) : events;
 }
@@ -131,6 +133,16 @@ export function energyTrend(events, window = HOUR, now = Date.now()) {
   const current = span(now - window, now);
   const previous = span(now - 2 * window, now - window);
   return { current, previous, ratio: previous.energy ? current.energy / previous.energy : null };
+}
+
+// Compare the current (incomplete) clock hour with the preceding full hour.
+export function clockHourComparison(events, now = Date.now()) {
+  const start = Math.floor(now / HOUR) * HOUR; // Panama UTC-5 has whole-hour boundaries.
+  const sum = (from, to, inclusive) => events.filter(e => e.time >= from && (inclusive ? e.time <= to : e.time < to))
+    .reduce((v, e) => ({ count: v.count + 1, energy: v.energy + energyJoules(e.mag) }), { count: 0, energy: 0 });
+  const previous = sum(start - HOUR, start, false);
+  const current = sum(start, now, true);
+  return { previous, current, ratio: previous.energy ? current.energy / previous.energy : null, start, now };
 }
 
 // 'up' | 'down' | 'same' | 'none'. Energy varies by orders of magnitude, so within ×2 counts as similar.
@@ -169,7 +181,7 @@ const secondsFormat = new Intl.DateTimeFormat('es-PA', { timeZone: 'America/Pana
 // Estimated S-wave arrival at the query center (hypocentral distance, average crustal speed).
 // Catalogs publish minutes after the quake, so it has almost always arrived when the notice is sent.
 export function arrivalLine(event, fromWhere, now = Date.now()) {
-  if (!Number.isFinite(event.distance)) return '';
+  if (!Number.isFinite(event.distance) || event.source === 'geoshake') return '';
   const at = event.time + arrivalSeconds(event.distance, event.depth, WAVE_SPEED.s) * 1000;
   const toWhere = fromWhere.replace(/^del /, 'al ').replace(/^de /, 'a ');
   return at <= now ? `\nOnda S llegó ${toWhere} ≈ ${secondsFormat.format(at)}` : `\nOnda S llegaría ${toWhere} ≈ ${secondsFormat.format(at)} (estimado)`;

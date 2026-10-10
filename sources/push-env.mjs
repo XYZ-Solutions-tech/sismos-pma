@@ -10,5 +10,5 @@ export const publicKey = pushConfigured ? VAPID_PUBLIC_KEY : null;
 export const store = pushConfigured ? createRedisStore(Redis.fromEnv()) : null;
 
 const vapidDetails = { subject: 'https://sismos-pma.xyzsolutions.tech', publicKey: VAPID_PUBLIC_KEY, privateKey: VAPID_PRIVATE_KEY };
-export const sendPush = (subscription, message) =>
-  webpush.sendNotification(subscription, JSON.stringify(message), { TTL: 3600, urgency: 'high', vapidDetails });
+export const sendPush = (subscription, message, options = {}) =>
+  webpush.sendNotification(subscription, JSON.stringify(message), { TTL: 3600, urgency: 'high', ...options, vapidDetails });

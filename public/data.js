@@ -15,7 +15,7 @@ export function readSettings() {
     return { radius: [100, 300, 500, 1000, 2000].includes(saved?.radius) ? saved.radius : DEFAULTS.radius,
       hours: [1, 24, 168].includes(saved?.hours) ? saved.hours : DEFAULTS.hours,
       minMag: [0, 3, 4, 5, 6].includes(saved?.minMag) ? saved.minMag : DEFAULTS.minMag,
-      source: ['up', 'usgs', 'all'].includes(saved?.source) ? saved.source : DEFAULTS.source,
+      source: ['up', 'usgs', 'geoshake', 'all'].includes(saved?.source) ? saved.source : DEFAULTS.source,
       ripples: ['all', 'hour', 'none'].includes(saved?.ripples) ? saved.ripples : DEFAULTS.ripples,
       notify: saved?.notify === true };
   } catch { return { ...DEFAULTS }; }

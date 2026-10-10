@@ -1,5 +1,6 @@
 import { PANAMA, HOUR, REFRESH_MS, SOURCE_LABELS, filterEvents, histogram, changes, magnitudeColor, escapeHTML, displayPlace, findTwin, twinIds, isProvisionalDepth,
-  uniqueEvents, energyTrend, trendDirection, energyJump, formatEnergy, formatRatio, formatTNT } from './domain.js';
+  uniqueEvents, clockHourComparison, energyTrend, trendDirection, energyJump, formatEnergy, formatRatio, formatTNT, normalize } from './domain.js';
+import { geoShakeMessage } from './geoshake.js';
 import { loadEarthquakes, readSettings, saveSettings } from './data.js';
 import { createEarthquakeMap } from './map.js';
 import { WAVE_SPEED, arrivalSeconds, surfaceRadiusKm } from './waves.js';
@@ -47,7 +48,7 @@ function selectEvent(id) {
 }
 
 function waveTimes(event = selectedEvent()) {
-  if (!event) return null;
+  if (!event || event.source === 'geoshake') return null;
   const depth = event.depth ?? 0;
   const p = arrivalSeconds(event.distance, depth, WAVE_SPEED.p);
   const s = arrivalSeconds(event.distance, depth, WAVE_SPEED.s);
@@ -60,6 +61,7 @@ function renderDetail(event) {
   const color = magnitudeColor(event.mag);
   const place = displayPlace(event.place);
   const times = waveTimes(event);
+  const unknownDepth = event.source === 'geoshake';
   const status = { reviewed: 'Revisado', preliminary: 'Preliminar', automatic: 'Automático' }[event.status] || 'Sin estado';
   const twin = findTwin(event, state.events);
   const twinVisible = twin && state.visible.some(e => e.id === twin.id);
@@ -70,16 +72,17 @@ function renderDetail(event) {
     <div class="detail-grid">
       <div><strong>${num.format(event.distance)}<small> km</small></strong><span>${fromWhere()}</span></div>
       <div><strong>${event.depth === null ? '—' : event.depth.toFixed(1)}<small> km</small></strong><span>${provisional ? 'prof. provisional' : 'de profundidad'}</span></div>
-      <div class="tile p" id="tile-p"><strong>+${times.p.toFixed(1)}<small> s</small></strong><span>onda P llegó ${toWhere()}</span></div>
-      <div class="tile s" id="tile-s"><strong>+${times.s.toFixed(1)}<small> s</small></strong><span>onda S llegó ${toWhere()}</span></div>
+      <div class="tile p" id="tile-p"><strong>${unknownDepth ? '—' : `+${times?.p.toFixed(1)}`}<small> s</small></strong><span>${unknownDepth ? 'onda P: llegada no disponible' : `onda P llegó ${toWhere()}`}</span></div>
+      <div class="tile s" id="tile-s"><strong>${unknownDepth ? '—' : `+${times?.s.toFixed(1)}`}<small> s</small></strong><span>${unknownDepth ? 'onda S: llegada no disponible' : `onda S llegó ${toWhere()}`}</span></div>
     </div>
+    ${unknownDepth ? '<p class="detail-note">GeoShake no informa profundidad. No hay una estimación de llegada de ondas disponible. Se excluye de la comparación de energía para evitar duplicar registros oficiales.</p>' : ''}
     ${provisional ? '<p class="detail-note">10 km suele ser una profundidad provisional o fijada cuando no se pudo calcular: no es necesariamente una medición exacta. Los tiempos P y S la usan como aproximación.</p>' : ''}
     ${twin ? (twinVisible ? `<button class="twin" data-id="${escapeHTML(twin.id)}"><i style="background:${magnitudeColor(twin.mag)}"></i><span>${twinText}</span></button>` : `<p class="twin"><i style="background:${magnitudeColor(twin.mag)}"></i><span>${twinText}</span></p>`) : ''}
     <div class="detail-bottom"><span>${event.magType ? `Tipo ${escapeHTML(event.magType)}` : 'Tipo de magnitud no informado'} · ${event.felt === null ? 'percepción no informada' : `${num.format(event.felt)} reportes de percepción`}</span><a href="${escapeHTML(event.url)}" target="_blank" rel="noopener noreferrer">Ver ficha ${SOURCE_LABELS[event.source]} ↗</a></div>`;
 }
 
 function renderSources() {
-  for (const id of ['up', 'usgs']) {
+  for (const id of ['up', 'usgs', 'geoshake']) {
     const source = state.sources.find(source => source.id === id);
     const stale = source && sourceIsStale(source);
     const latest = filterEvents(state.events, { ...state, source: id }).reduce((time, event) => Math.max(time, event.time), 0);
@@ -87,7 +90,7 @@ function renderSources() {
     $(`source-${id}`).textContent = !source ? `${SOURCE_LABELS[id]}: consultando…` : !source.available ? `${SOURCE_LABELS[id]}: consulta no disponible` :
       `${SOURCE_LABELS[id]}: ${stale ? 'datos anteriores · ' : ''}consultado ${timeFormat.format(source.fetchedAt)} · último en tu consulta ${latest ? dateFormat.format(latest) : 'ninguno'}`;
   }
-  $('count-note').textContent = state.source === 'all' ? 'Un sismo puede tener un registro en cada fuente y aparecer dos veces («también en…»). Los conteos son registros, no sismos únicos.' : `Mostrando registros de ${SOURCE_LABELS[state.source]}.`;
+  $('count-note').textContent = state.source === 'all' ? 'Un sismo puede tener un registro en cada fuente y aparecer en varios catálogos («también en…»). Los conteos son registros, no sismos únicos.' : `Mostrando registros de ${SOURCE_LABELS[state.source]}.`;
   const sources = activeSources();
   state.stale = sources.some(sourceIsStale);
   if (state.loaded && !state.loading) connection(state.stale ? 'Fuente sin actualizar' : 'Consultas al día', state.stale);
@@ -196,7 +199,7 @@ function render() {
     const depth = event.depth === null ? 'prof. —' : isProvisionalDepth(event.depth) ? 'prof. 10 km (prov.)' : `prof. ${num.format(event.depth)} km`;
     const other = event.source === 'up' ? 'USGS' : 'UP';
     return `<button class="event ${event.id === state.selected ? 'selected' : ''}" data-id="${escapeHTML(event.id)}" aria-pressed="${event.id === state.selected}">
-    <span class="event-mag" style="--mag-color:${magnitudeColor(event.mag)}">${magText(event.mag)}</span><span class="event-info"><span class="event-place">${escapeHTML(place.title)}</span><span class="event-time">${timeFormat.format(event.time)} · ${ago(event.time)}${newIds.has(event.id) ? '<b class="new-tag">Nuevo</b>' : ''}</span><span class="event-meta"><b>${num.format(event.distance)} km</b><span>${depth}</span><i class="source-tag ${event.source}">${event.source === 'up' ? 'UP' : 'USGS'}${event.status === 'preliminary' ? ' · prelim.' : ''}</i>${twins.has(event.id) ? `<i class="twin-tag" title="Probablemente el mismo sismo que un registro de ${other}">también en ${other}</i>` : ''}</span></span></button>`;
+    <span class="event-mag" style="--mag-color:${magnitudeColor(event.mag)}">${magText(event.mag)}</span><span class="event-info"><span class="event-place">${escapeHTML(place.title)}</span><span class="event-time">${timeFormat.format(event.time)} · ${ago(event.time)}${newIds.has(event.id) ? '<b class="new-tag">Nuevo</b>' : ''}</span><span class="event-meta"><b>${num.format(event.distance)} km</b><span>${depth}</span><i class="source-tag ${event.source}">${event.source === 'up' ? 'UP' : SOURCE_LABELS[event.source]}${event.status === 'preliminary' ? ' · prelim.' : ''}</i>${twins.has(event.id) ? `<i class="twin-tag" title="Probablemente el mismo sismo que un registro de ${other}">también en ${other}</i>` : ''}</span></span></button>`;
   }).join('') : `<p class="empty">${available ? 'No hay registros publicados que coincidan con estos filtros. Amplía el radio, el período o baja la magnitud mínima.' : state.failed || state.sources.length ? 'La fuente seleccionada no está disponible. Puedes cambiar de fuente o esperar el próximo intento.' : 'Consultando USGS y Geociencias UP…'}</p>`;
   renderDetail(selectedEvent());
   renderLocation();
@@ -238,10 +241,25 @@ function renderTrend(now) {
     $('trend-arrow').textContent = '·';
     $('trend-detail').textContent = 'Esperando los catálogos…';
     $('activity-trend').innerHTML = '';
+    $('energy-comparison').innerHTML = '';
     return;
   }
   // Ignores the period filter: always the last hours, with radius, magnitude and source.
   const recent = uniqueEvents(filterEvents(state.events, { ...state, hours: 12 }, now));
+  const comparison = clockHourComparison(recent, now);
+  const { previous, current, ratio, start } = comparison;
+  const maximum = Math.max(previous.energy, current.energy, 1);
+  const changed = ratio === null ? (current.energy ? 'Sin energía en la hora anterior' : 'Sin energía registrada')
+    : ratio >= 1 ? `${formatRatio(ratio)} la energía anterior` : current.energy ? `${formatRatio(1 / ratio)} menos energía` : 'Sin energía en la franja actual';
+  const chart = $('energy-comparison');
+  chart.dataset.direction = ratio !== null && ratio > 1 ? 'up' : 'down';
+  chart.innerHTML = `<div class="energy-totals"><strong>${formatEnergy(previous.energy)}</strong><strong>${formatEnergy(current.energy)}</strong></div>
+    <strong class="energy-ratio">${escapeHTML(changed)}</strong>
+    <p>${sismos(current.count)} en la franja actual, frente a ${sismos(previous.count)} en la hora anterior.</p>
+    <div class="energy-bars" role="img" aria-label="Energía aproximada, escala lineal: anterior ${formatEnergy(previous.energy)}, actual ${formatEnergy(current.energy)}">
+      ${[previous, current].map(v => `<div><span>${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(v.energy / 1e12)}</span><i style="height:${v.energy ? Math.max(2, v.energy / maximum * 150) : 0}px"></i></div>`).join('')}
+    </div><div class="energy-periods"><span>${shortTime.format(start - HOUR)}–${shortTime.format(start)}</span><span>${shortTime.format(start)}–${shortTime.format(now)}</span></div>
+    <p>Barras en billones de julios (10¹² J). Franja actual incompleta; no se extrapola. Esto describe lo registrado, no predice si la actividad se calmará. GeoShake se excluye de energía y frecuencia para evitar duplicar los catálogos oficiales.</p>`;
   const hour = energyTrend(recent, HOUR, now);
   const six = energyTrend(recent, 6 * HOUR, now);
   const h = trendSummary(hour, 'la hora anterior');
@@ -304,7 +322,7 @@ function syncPlayer() {
         $(`label-${kind}`).style.left = left;
       }
     } else {
-      $('wave-title').textContent = 'Selecciona un sismo';
+      $('wave-title').textContent = selectedEvent()?.source === 'geoshake' ? 'GeoShake: profundidad no disponible' : 'Selecciona un sismo';
       $('wave-sub').textContent = 'Repetición educativa de las ondas P y S desde el epicentro hasta tu ubicación. No es una alerta.';
     }
     $('wave-card').classList.toggle('empty', !times);
@@ -484,6 +502,8 @@ async function refresh() {
     const payload = await loadEarthquakes(AbortSignal.timeout(25_000));
     const detected = changes(state.previous, payload.events);
     const diff = { added: detected.added.filter(e => state.seenSources.has(e.source)), revised: detected.revised.filter(e => state.seenSources.has(e.source)) };
+    const live = state.events.filter(e => e.source === 'geoshake' && !payload.events.some(p => p.id === e.id));
+    payload.events.push(...live.filter(e => e.time >= Date.now() - 7 * 24 * HOUR));
     state.events = payload.events;
     state.sources = payload.sources;
     state.loaded = payload.sources.some(source => source.available);
@@ -492,7 +512,7 @@ async function refresh() {
     for (const source of payload.sources) if (source.available) state.seenSources.add(source.id);
     for (const event of diff.added) state.newIds.set(event.id, Date.now());
     state.previous = new Map(payload.events.map(e => [e.id, e.updated]));
-    const addedEvents = filterEvents(diff.added, state);
+    const addedEvents = filterEvents(diff.added.filter(e => e.source !== 'geoshake'), state);
     const addedHere = addedEvents.length;
     const revisedHere = filterEvents(diff.revised, state).length;
     // A sharp energy rise is said once an hour, in the notice and in the notification title.
@@ -605,6 +625,25 @@ addEventListener('online', refresh);
 navigator.permissions?.query({ name: 'geolocation' }).then(status => { if (status.state === 'granted') locate(true); }).catch(() => {});
 render();
 refresh();
+
+// EventSource reconnects automatically; individual station triggers are not earthquake events.
+const geoStream = new EventSource('/api/geoshake-live');
+geoStream.onopen = () => { $('geoshake-live').textContent = 'GeoShake: conexión en vivo'; };
+geoStream.onerror = () => { $('geoshake-live').textContent = 'GeoShake: reconectando; catálogo disponible en las consultas'; };
+geoStream.onmessage = message => {
+  const feature = geoShakeMessage(message.data);
+  if (!feature) return;
+  const event = normalize([feature])[0];
+  const isNew = !state.events.some(e => e.id === event.id);
+  state.events = [event, ...state.events.filter(e => e.id !== event.id)].sort((a, b) => b.time - a.time);
+  state.previous?.set(event.id, event.updated);
+  const source = state.sources.find(s => s.id === 'geoshake');
+  if (source) Object.assign(source, { available: true, fetchedAt: Date.now(), error: null, stale: false });
+  if (isNew && event.time >= Date.now() - 300_000) state.newIds.set(event.id, Date.now());
+  render();
+  if (isNew && event.time >= Date.now() - 300_000 && state.notify) notifyNewRecords(filterEvents([event], state), fromWhere());
+};
+addEventListener('pagehide', () => geoStream.close(), { once: true });
 // Re-register Web Push on every visit: covers avisos activated before push existed and lost server records.
 if (state.notify && notificationPermission() === 'granted') pushTask = enablePush(pushFilters);
 // Vercel Web Analytics exists only on the deployed site (script served from /_vercel/insights).

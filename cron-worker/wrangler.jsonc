@@ -9,6 +9,8 @@
   "workers_dev": false,
   "preview_urls": false,
   "triggers": { "crons": ["* * * * *"] },
-  "vars": { "CHECK_URL": "https://sismos-pma.xyzsolutions.tech/api/push-check" },
+  "vars": { "CHECK_URL": "https://sismos-pma.xyzsolutions.tech/api/push-check", "GEOSHAKE_INGEST_URL": "https://sismos-pma.xyzsolutions.tech/api/geoshake" },
+  "durable_objects": { "bindings": [{ "name": "GEOSHAKE_STREAM", "class_name": "GeoShakeStream" }] },
+  "migrations": [{ "tag": "geoshake-v1", "new_sqlite_classes": ["GeoShakeStream"] }],
   "observability": { "enabled": true }
 }

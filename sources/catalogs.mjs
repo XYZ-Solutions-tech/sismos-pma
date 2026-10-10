@@ -1,5 +1,7 @@
 import { GEOCIENCIAS_URL, parseGeociencias } from './geociencias.mjs';
 
+import { parseGeoShake } from './geoshake.mjs';
+
 const TTL = 30_000;
 const STALE_MS = 5 * 60_000;
 const USGS_URL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson';
@@ -50,6 +52,7 @@ export function parseUSGS(text) {
 }
 
 const catalogs = [
+  createCatalog({ id: 'geoshake', label: 'GeoShake', url: 'https://api.geoshake.org/api/events', parse: parseGeoShake }),
   createCatalog({ id: 'up', label: 'Geociencias UP', url: GEOCIENCIAS_URL, parse: parseGeociencias }),
   createCatalog({ id: 'usgs', label: 'USGS', url: USGS_URL, parse: parseUSGS }),
 ];

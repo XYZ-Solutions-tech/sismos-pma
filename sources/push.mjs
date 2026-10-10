@@ -24,7 +24,7 @@ export function parseSubscription(body, previousFilters) {
     filters: { located, lat: located ? Math.round(filters.lat * 10) / 10 : PANAMA.lat, lon: located ? Math.round(filters.lon * 10) / 10 : PANAMA.lon,
       radius: [100, 300, 500, 1000, 2000].includes(filters.radius) ? filters.radius : 1000,
       minMag: [0, 3, 4, 5, 6].includes(filters.minMag) ? filters.minMag : 0,
-      source: ['up', 'usgs', 'all'].includes(filters.source) ? filters.source : 'all',
+      source: ['up', 'usgs', 'geoshake', 'all'].includes(filters.source) ? filters.source : 'all',
       hours: [1, 24, 168].includes(filters.hours) ? filters.hours : 24 },
   };
 }
@@ -53,6 +53,8 @@ export function createRedisStore(redis, { now = Date.now } = {}) {
       for (const event of events) seen.get(source)?.add(event.id);
       return events.filter((_, index) => added[index] === 1);
     },
+    claimDelivery: (id, key) => redis.set(`sismos:delivery:${id}:${key}`, 1, { nx: true, ex: 8 * 86400 }),
+    releaseDelivery: (id, key) => redis.del(`sismos:delivery:${id}:${key}`),
     async subscriptions() {
       return Object.entries(await redis.hgetall(SUBSCRIPTIONS) ?? {}).map(([key, record]) => ({ key, ...record }));
     },
@@ -78,7 +80,7 @@ export async function runPushCheck({ store, loadCatalogs, send, now = Date.now()
   const events = normalize(payload.data.features);
   const fresh = [];
   for (const source of payload.sources) {
-    if (!source.available || source.error) continue;
+    if (source.id === 'geoshake' || !source.available || source.error) continue;
     const current = events.filter(event => event.source === source.id);
     const known = await store.seen(source.id);
     if (!known.size) { await store.seed(source.id, current); continue; }
