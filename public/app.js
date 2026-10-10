@@ -113,6 +113,8 @@ function renderNotify() {
 const pushFilters = () => ({ located: Boolean(state.located), lat: Math.round(state.center.lat * 10) / 10, lon: Math.round(state.center.lon * 10) / 10,
   radius: state.radius, minMag: state.minMag, source: state.source, hours: state.hours });
 let pushSync = 0;
+// The last subscribe request: turning avisos off waits for it, or it would re-create the server record.
+let pushTask = Promise.resolve(false);
 function syncPush() {
   if (!state.notify) return;
   clearTimeout(pushSync);
@@ -124,7 +126,7 @@ async function toggleNotify() {
     state.notify = false;
     saveSettings(state);
     renderNotify();
-    disablePush();
+    pushTask.then(disablePush);
     return notice('Avisos desactivados. Se borró la suscripción de este dispositivo.');
   }
   const permission = await requestNotifications();
@@ -133,7 +135,7 @@ async function toggleNotify() {
     saveSettings(state);
     renderNotify();
     const scope = `${num.format(state.radius)} km ${fromWhere()}${state.minMag ? ` desde M ${state.minMag}` : ''}`;
-    const push = await enablePush(pushFilters);
+    const push = await (pushTask = enablePush(pushFilters));
     showNotification('Avisos activados', `Nuevos registros a ${scope}${push ? ', también con el panel cerrado.' : ' mientras el panel esté abierto.'}`);
     notice(push ? `Avisos activados para nuevos registros a ${scope}, también con el panel cerrado (revisión cada minuto). Cambiar los filtros actualiza los avisos.`
       : `Avisos activados para nuevos registros a ${scope}. Este navegador solo los recibe mientras el panel esté abierto.`);
@@ -540,6 +542,6 @@ navigator.permissions?.query({ name: 'geolocation' }).then(status => { if (statu
 render();
 refresh();
 // Re-register Web Push on every visit: covers avisos activated before push existed and lost server records.
-if (state.notify && notificationPermission() === 'granted') enablePush(pushFilters);
+if (state.notify && notificationPermission() === 'granted') pushTask = enablePush(pushFilters);
 // Vercel Web Analytics exists only on the deployed site (script served from /_vercel/insights).
 if (!['localhost', '127.0.0.1'].includes(location.hostname)) import('/vendor/vercel-analytics.js').then(({ inject }) => inject()).catch(() => {});
