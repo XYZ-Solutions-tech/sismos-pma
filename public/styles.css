@@ -1800,3 +1800,30 @@ dialog::backdrop {
 .installation-note { font-size: 14px; color: var(--muted); }
 .app-update { position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 10000; width: min(440px, calc(100% - 32px)); padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--accent); box-shadow: var(--shadow); display: flex; gap: 16px; align-items: center; }
 .app-update button { background: var(--accent); color: var(--bg); border: 0; border-radius: 10px; padding: 12px; }
+
+.install-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 20px 0 8px; }
+.demo-phone { width: 220px; height: 300px; flex-shrink: 0; border: 5px solid #344950; border-radius: 28px; position: relative; overflow: hidden; background: var(--bg); }
+.demo-address { margin: 12px 8px; padding: 10px 6px; background: var(--chip); border-radius: 12px; font-size: 10px; }
+.demo-brand { text-align: center; font-weight: 700; font-size: 22px; padding: 14px; color: var(--accent); }
+.demo-toolbar { position: absolute; bottom: 0; width: 100%; padding: 12px; background: var(--chip); text-align: center; }
+.demo-share, .demo-dots { position: relative; color: var(--accent); display: inline-block; font-weight: 700; }
+.demo-menu { position: absolute; left: 8px; right: 8px; top: 106px; padding: 14px; background: #263e48; border-radius: 14px; display: grid; gap: 14px; font-size: 11px; animation: install-menu 7s infinite; }
+.demo-menu strong { background: var(--panel); padding: 10px 6px; border-radius: 8px; }
+.demo-confirm { text-align: right; color: var(--accent); font-weight: 700; animation: install-confirm 7s infinite; }
+.demo-hand { position: absolute; color: var(--accent); left: 3px; top: 5px; font-size: 24px; opacity: .5; animation: install-tap 7s infinite; }
+.demo-caption { flex: 1; min-width: 190px; padding-left: 24px; line-height: 2; font-size: 15px; }
+.demo-disclaimer { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.demo-launch { display: grid; justify-items: center; gap: 8px; padding: 20px; background: var(--inset); border-radius: 14px; }
+.demo-launch img { border-radius: 16px; animation: launch-icon 4s infinite; }
+.demo-launch-hint { font-size: 12px; color: var(--muted); }
+.demo-permission { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 16px; padding: 20px; background: var(--inset); border-radius: 14px; }
+.demo-permission span:first-child, .demo-permission strong { border: 1px solid var(--accent); padding: 12px; border-radius: 10px; }
+.demo-permission strong { background: var(--accent); color: var(--bg); }
+.installation-footer { padding-top: 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.installation-footer a { color: var(--accent); font-weight: 600; }
+.installation-footer span { display: block; margin-top: 8px; font-size: 12px; }
+@keyframes install-menu { 0%, 22% { opacity: 0; transform: translateY(16px); } 32%, 92% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; } }
+@keyframes install-tap { 0%, 20% { transform: scale(.7); opacity: .15; } 25%, 32% { transform: scale(1.15); opacity: .8; } 40%, 100% { opacity: 0; } }
+@keyframes install-confirm { 0%, 65% { opacity: .4; } 75%, 90% { opacity: 1; } 100% { opacity: .4; } }
+@keyframes launch-icon { 0%, 60%, 100% { transform: scale(1); } 75% { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .demo-menu, .demo-confirm, .demo-hand, .demo-launch img { animation: none; } .demo-hand { display: none; } }
