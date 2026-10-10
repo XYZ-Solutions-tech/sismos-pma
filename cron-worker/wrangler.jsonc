@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "sismos-pma-cron",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  // XYZ Solutions account (same as the xyzsolutions.tech zone).
+  "account_id": "3e4216c896dd343d6e18a31e27d4cf33",
+  // No public URL: the Worker only runs on its schedule.
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": { "CHECK_URL": "https://sismos-pma.xyzsolutions.tech/api/push-check" },
+  "observability": { "enabled": true }
+}

@@ -1,15 +1,13 @@
-import { SOURCE_LABELS, displayPlace } from './domain.js';
+import { newRecordsMessage } from './domain.js';
 
-// Local notifications only: there is no push server. Each catalog check of an
-// open panel (or one the browser still runs in the background) may show one.
+// Local notifications come from the open panel after each catalog check. Web Push
+// (api/push-check.js, every minute) covers the panel closed; both use the same tag,
+// so a push for a record already announced locally replaces it silently.
 const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const worker = 'serviceWorker' in navigator
   ? navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).catch(() => null)
   : Promise.resolve(null);
-const num = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
-const clock = new Intl.DateTimeFormat('es-PA', { timeZone: 'America/Panama', hour: '2-digit', minute: '2-digit', hour12: false });
-const magText = mag => mag === null ? '—' : mag.toFixed(1);
 
 // beforeinstallprompt can fire while app.js is still awaiting the map, so capture it on import.
 let installPrompt = null;
@@ -41,9 +39,9 @@ export async function requestNotifications() {
   return notificationPermission();
 }
 
-export async function showNotification(title, body, data = {}) {
+export async function showNotification(title, body, data = {}, tag) {
   if (notificationPermission() !== 'granted') return;
-  const options = { body, data, icon: '/icon-192.png', lang: 'es' };
+  const options = { body, data, tag, icon: '/icon-192.png', lang: 'es' };
   try {
     // Android only shows notifications through the service worker.
     const registration = await worker;
@@ -55,13 +53,46 @@ export async function showNotification(title, body, data = {}) {
 // `events` come from filterEvents (with `distance`); one notification per check.
 export function notifyNewRecords(events, fromWhere) {
   if (!events.length) return;
-  const top = events.reduce((best, e) => ((e.mag ?? -Infinity) > (best.mag ?? -Infinity) ? e : best));
-  const place = displayPlace(top.place).title;
-  const where = `${num.format(top.distance)} km ${fromWhere}`;
-  if (events.length === 1) {
-    return showNotification(`Sismo M ${magText(top.mag)} · ${SOURCE_LABELS[top.source]}`, `${place}\n${where} · ${clock.format(top.time)} (hora de Panamá)`, { id: top.id });
-  }
-  return showNotification(`${events.length} nuevos registros en tu zona`, `Mayor: M ${magText(top.mag)} · ${place}\n${where} · ${SOURCE_LABELS[top.source]}`, { id: top.id });
+  const { title, body, id, tag } = newRecordsMessage(events, fromWhere);
+  return showNotification(title, body, { id }, tag);
+}
+
+// ——— Web Push: the server stores the subscription with the panel's filters ———
+
+const keyBytes = key => Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+const sameKey = (buffer, bytes) => Boolean(buffer) && new Uint8Array(buffer).every((byte, index) => byte === bytes[index]) && buffer.byteLength === bytes.length;
+
+async function savePush(subscription, filters) {
+  const response = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription, filters }) });
+  return response.ok;
+}
+
+// True when this browser now receives avisos with the panel closed. `filters` is read
+// right before saving, so a location found meanwhile is not overwritten.
+export async function enablePush(filters) {
+  const registration = await worker;
+  if (!registration?.pushManager || notificationPermission() !== 'granted') return false;
+  try {
+    const { publicKey } = await (await fetch('/api/push', { cache: 'no-store' })).json();
+    if (!publicKey) return false;
+    const key = keyBytes(publicKey);
+    let subscription = await registration.pushManager.getSubscription();
+    if (subscription && !sameKey(subscription.options.applicationServerKey, key)) { await subscription.unsubscribe(); subscription = null; }
+    subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    return await savePush(subscription, filters());
+  } catch { return false; }
+}
+
+export async function updatePushFilters(filters) {
+  const subscription = await (await worker)?.pushManager?.getSubscription().catch(() => null);
+  if (subscription) await savePush(subscription, filters).catch(() => {});
+}
+
+export async function disablePush() {
+  const subscription = await (await worker)?.pushManager?.getSubscription().catch(() => null);
+  if (!subscription) return;
+  await fetch('/api/push', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: subscription.endpoint }) }).catch(() => {});
+  await subscription.unsubscribe().catch(() => {});
 }
 
 // A tapped notification focuses the panel and selects its event.

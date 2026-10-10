@@ -2,7 +2,7 @@ import { PANAMA, HOUR, REFRESH_MS, SOURCE_LABELS, filterEvents, histogram, chang
 import { loadEarthquakes, readSettings, saveSettings } from './data.js';
 import { createEarthquakeMap } from './map.js';
 import { WAVE_SPEED, arrivalSeconds, surfaceRadiusKm } from './waves.js';
-import { notificationPermission, requestNotifications, showNotification, notifyNewRecords, onNotificationSelect, watchInstall, promptInstall } from './notify.js';
+import { notificationPermission, requestNotifications, showNotification, notifyNewRecords, onNotificationSelect, watchInstall, promptInstall, enablePush, updatePushFilters, disablePush } from './notify.js';
 
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -109,12 +109,23 @@ function renderNotify() {
   $('notify').querySelector('span').textContent = on ? 'Avisos activos' : 'Activar avisos';
 }
 
+// Filters the server uses for Web Push. A personal location leaves the browser rounded to ~11 km.
+const pushFilters = () => ({ located: Boolean(state.located), lat: Math.round(state.center.lat * 10) / 10, lon: Math.round(state.center.lon * 10) / 10,
+  radius: state.radius, minMag: state.minMag, source: state.source, hours: state.hours });
+let pushSync = 0;
+function syncPush() {
+  if (!state.notify) return;
+  clearTimeout(pushSync);
+  pushSync = setTimeout(() => updatePushFilters(pushFilters()), 1500);
+}
+
 async function toggleNotify() {
   if (state.notify && notificationPermission() === 'granted') {
     state.notify = false;
     saveSettings(state);
     renderNotify();
-    return notice('Avisos desactivados.');
+    disablePush();
+    return notice('Avisos desactivados. Se borró la suscripción de este dispositivo.');
   }
   const permission = await requestNotifications();
   if (permission === 'granted') {
@@ -122,8 +133,10 @@ async function toggleNotify() {
     saveSettings(state);
     renderNotify();
     const scope = `${num.format(state.radius)} km ${fromWhere()}${state.minMag ? ` desde M ${state.minMag}` : ''}`;
-    showNotification('Avisos activados', `Nuevos registros a ${scope} mientras el panel esté abierto.`);
-    notice(`Avisos activados para nuevos registros a ${scope}. Llegan mientras el panel esté abierto; en segundo plano, el navegador puede espaciar o pausar las consultas.`);
+    const push = await enablePush(pushFilters);
+    showNotification('Avisos activados', `Nuevos registros a ${scope}${push ? ', también con el panel cerrado.' : ' mientras el panel esté abierto.'}`);
+    notice(push ? `Avisos activados para nuevos registros a ${scope}, también con el panel cerrado (revisión cada minuto). Cambiar los filtros actualiza los avisos.`
+      : `Avisos activados para nuevos registros a ${scope}. Este navegador solo los recibe mientras el panel esté abierto.`);
   } else if (permission === 'install') {
     notice('En iPhone y iPad los avisos requieren abrir el panel desde la pantalla de inicio: Compartir → Agregar a inicio, y actívalos desde allí.', 'warning');
   } else if (permission === 'denied') {
@@ -390,6 +403,7 @@ function locate(quiet = false) {
     state.fitNext = true;
     if (!quiet) notice(`Ubicación obtenida con precisión aproximada de ${num.format(position.coords.accuracy)} m. No se guarda.`);
     render();
+    syncPush();
   }, () => {
     state.locating = false;
     renderLocation();
@@ -442,7 +456,7 @@ async function refresh() {
   }
 }
 
-function changedFilters() { saveSettings(state); render(); }
+function changedFilters() { saveSettings(state); render(); syncPush(); }
 $('events').addEventListener('click', event => { const button = event.target.closest('[data-id]'); if (button) selectEvent(button.dataset.id); });
 $('detail').addEventListener('click', event => { const button = event.target.closest('[data-id]'); if (button) selectEvent(button.dataset.id); });
 $('stat-max').addEventListener('click', () => { if ($('stat-max').dataset.id) selectEvent($('stat-max').dataset.id); });
@@ -509,7 +523,7 @@ $('close-about').addEventListener('click', () => $('about').close());
 $('activity-button').addEventListener('click', () => $('activity-dialog').showModal());
 $('close-activity').addEventListener('click', () => $('activity-dialog').close());
 $('locate').addEventListener('click', () => locate());
-$('reset-location').addEventListener('click', () => { state.center = { ...PANAMA }; state.located = null; state.fitNext = true; notice(''); render(); });
+$('reset-location').addEventListener('click', () => { state.center = { ...PANAMA }; state.located = null; state.fitNext = true; notice(''); render(); syncPush(); });
 setInterval(() => {
   const seconds = Math.max(0, Math.ceil((state.nextAt - Date.now()) / 1000));
   $('countdown').textContent = state.loading ? 'Consultando…' : `Próxima consulta en ${seconds} s`;
@@ -525,3 +539,7 @@ addEventListener('online', refresh);
 navigator.permissions?.query({ name: 'geolocation' }).then(status => { if (status.state === 'granted') locate(true); }).catch(() => {});
 render();
 refresh();
+// Re-register Web Push on every visit: covers avisos activated before push existed and lost server records.
+if (state.notify && notificationPermission() === 'granted') enablePush(pushFilters);
+// Vercel Web Analytics exists only on the deployed site (script served from /_vercel/insights).
+if (!['localhost', '127.0.0.1'].includes(location.hostname)) import('/vendor/vercel-analytics.js').then(({ inject }) => inject()).catch(() => {});

@@ -362,9 +362,9 @@
               Después de un sismo grande pueden aparecer réplicas; su frecuencia suele disminuir con el tiempo. Esto no
               permite predecir el próximo evento. Se consultan el feed GeoJSON de USGS y el listado oficial de
               Geociencias UP cada 30 segundos mientras el panel está abierto; un navegador en segundo plano puede
-              espaciar o pausar las consultas. Con los avisos activados, cada registro nuevo dentro de tus filtros
-              genera una notificación local en este dispositivo; no hay un servidor que envíe alertas con el panel
-              cerrado.
+              espaciar o pausar las consultas. Con los avisos activados, los registros nuevos dentro de tus filtros
+              generan una notificación; con el panel cerrado, el servidor revisa los catálogos cada minuto y la envía
+              por Web Push. Llega cuando la fuente publica, minutos después del sismo: no es una alerta temprana.
             </p>
             <p>
               Las fuentes pueden publicar con retraso, revisar valores o retirar registros. Geociencias UP usa hora local
@@ -381,7 +381,10 @@
         </article>
         <p class="privacy">
           Tu ubicación solo se usa en este navegador para dibujar tu punto, calcular distancias y filtrar el catálogo.
-          No se guarda ni se envía a los catálogos. Si ya diste permiso, el panel la pide al abrirse. El mapa se carga
+          No se guarda ni se envía a los catálogos. Si ya diste permiso, el panel la pide al abrirse. Si activas los
+          avisos, el servidor guarda la suscripción push de este navegador y tus filtros (radio, magnitud, fuente y
+          período) y, si usas tu ubicación, tu zona redondeada a unos 11 km; desactivar los avisos los borra. Las
+          visitas se miden con Vercel Web Analytics, sin cookies. El mapa se carga
           desde Google Maps cuando hay una clave configurada; en caso contrario se usa Esri. El proveedor del mapa recibe
           las solicitudes necesarias para mostrar la zona visible.
         </p>

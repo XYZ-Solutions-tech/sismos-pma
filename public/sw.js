@@ -28,6 +28,30 @@ self.addEventListener('fetch', event => {
     || Response.error()));
 });
 
+// Web Push from api/push-check.js. Same tag as the panel's local notification for the record.
+self.addEventListener('push', event => {
+  let message = {};
+  try { message = event.data?.json() ?? {}; } catch { /* Not JSON: show the generic title. */ }
+  event.waitUntil(self.registration.showNotification(message.title || 'Nuevo registro sísmico', {
+    body: message.body, tag: message.tag, data: { id: message.id }, icon: '/icon-192.png', lang: 'es',
+  }));
+});
+
+// The browser rotated the subscription: move the stored filters to the new one.
+self.addEventListener('pushsubscriptionchange', event => {
+  event.waitUntil((async () => {
+    const old = event.oldSubscription;
+    let subscription = event.newSubscription;
+    if (!subscription) {
+      const { publicKey } = await (await fetch('/api/push', { cache: 'no-store' })).json();
+      if (!publicKey) return;
+      const key = Uint8Array.from(atob(publicKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+      subscription = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    }
+    await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription, oldEndpoint: old?.endpoint }) });
+  })());
+});
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const id = event.notification.data?.id;

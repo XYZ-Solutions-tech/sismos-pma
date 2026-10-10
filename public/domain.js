@@ -102,6 +102,23 @@ export function isProvisionalDepth(depth) {
   return depth === 10;
 }
 
+const kmFormat = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
+const clockFormat = new Intl.DateTimeFormat('es-PA', { timeZone: 'America/Panama', hour: '2-digit', minute: '2-digit', hour12: false });
+
+// One notification per check for the new records of a query (local or Web Push).
+// `events` come from filterEvents (with `distance`); the tag lets a push replace the local one.
+export function newRecordsMessage(events, fromWhere) {
+  const top = events.reduce((best, e) => ((e.mag ?? -Infinity) > (best.mag ?? -Infinity) ? e : best));
+  const mag = top.mag === null ? '—' : top.mag.toFixed(1);
+  const place = displayPlace(top.place).title;
+  const where = `${kmFormat.format(top.distance)} km ${fromWhere}`;
+  const tag = `sismo-${top.id}`;
+  if (events.length === 1) {
+    return { title: `Sismo M ${mag} · ${SOURCE_LABELS[top.source]}`, body: `${place}\n${where} · ${clockFormat.format(top.time)} (hora de Panamá)`, id: top.id, tag };
+  }
+  return { title: `${events.length} nuevos registros en tu zona`, body: `Mayor: M ${mag} · ${place}\n${where} · ${SOURCE_LABELS[top.source]}`, id: top.id, tag };
+}
+
 export function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

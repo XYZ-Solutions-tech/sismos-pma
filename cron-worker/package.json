@@ -1,0 +1,7 @@
+{
+  "name": "sismos-pma-cron",
+  "private": true,
+  "type": "module",
+  "scripts": { "deploy": "wrangler deploy" },
+  "devDependencies": { "wrangler": "4.149.0" }
+}
