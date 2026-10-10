@@ -1,3 +1,5 @@
+import { WAVE_SPEED, arrivalSeconds } from './waves.js';
+
 export const PANAMA = { lat: 8.54, lon: -80.78, label: 'Panamá y alrededores' };
 export const HOUR = 3_600_000;
 export const REFRESH_MS = 30_000;
@@ -162,18 +164,30 @@ export function formatTNT(joules) {
   return `${ratioFormat.format(tons / 1e6)} Mt de TNT`;
 }
 
+const secondsFormat = new Intl.DateTimeFormat('es-PA', { timeZone: 'America/Panama', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+// Estimated S-wave arrival at the query center (hypocentral distance, average crustal speed).
+// Catalogs publish minutes after the quake, so it has almost always arrived when the notice is sent.
+export function arrivalLine(event, fromWhere, now = Date.now()) {
+  if (!Number.isFinite(event.distance)) return '';
+  const at = event.time + arrivalSeconds(event.distance, event.depth, WAVE_SPEED.s) * 1000;
+  const toWhere = fromWhere.replace(/^del /, 'al ').replace(/^de /, 'a ');
+  return at <= now ? `\nOnda S llegó ${toWhere} ≈ ${secondsFormat.format(at)}` : `\nOnda S llegaría ${toWhere} ≈ ${secondsFormat.format(at)} (estimado)`;
+}
+
 // One notification per check for the new records of a query (local or Web Push).
 // `events` come from filterEvents (with `distance`); the tag lets a push replace the local one.
 // With `jump` (an energyTrend that passed energyJump) the title announces the rise.
-export function newRecordsMessage(events, fromWhere, jump = null) {
+export function newRecordsMessage(events, fromWhere, jump = null, now = Date.now()) {
   const top = events.reduce((best, e) => ((e.mag ?? -Infinity) > (best.mag ?? -Infinity) ? e : best));
   const mag = top.mag === null ? '—' : top.mag.toFixed(1);
   const place = displayPlace(top.place).title;
   const where = `${kmFormat.format(top.distance)} km ${fromWhere}`;
   const tag = `sismo-${top.id}`;
+  const arrival = arrivalLine(top, fromWhere, now);
   const message = events.length === 1
-    ? { title: `Sismo M ${mag} · ${SOURCE_LABELS[top.source]}`, body: `${place}\n${where} · ${clockFormat.format(top.time)} (hora de Panamá)`, id: top.id, tag }
-    : { title: `${events.length} nuevos registros en tu zona`, body: `Mayor: M ${mag} · ${place}\n${where} · ${SOURCE_LABELS[top.source]}`, id: top.id, tag };
+    ? { title: `Sismo M ${mag} · ${SOURCE_LABELS[top.source]}`, body: `${place}\n${where} · ${clockFormat.format(top.time)} (hora de Panamá)${arrival}`, id: top.id, tag }
+    : { title: `${events.length} nuevos registros en tu zona`, body: `Mayor: M ${mag} · ${place}\n${where} · ${SOURCE_LABELS[top.source]}${arrival}`, id: top.id, tag };
   if (!jump) return message;
   return { ...message, title: `↑ Energía: ${formatRatio(jump.ratio)} la hora anterior`, body: `${message.title}\n${message.body}` };
 }

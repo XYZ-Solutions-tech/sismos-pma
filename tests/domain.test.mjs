@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { distanceKm, filterEvents, normalize, histogram, changes, twinIds, isProvisionalDepth, HOUR } from '../public/domain.js';
+import { distanceKm, filterEvents, normalize, histogram, changes, twinIds, isProvisionalDepth, newRecordsMessage, arrivalLine, HOUR } from '../public/domain.js';
 
 test('surface distance handles same point, dateline and antipodes', () => {
   assert.equal(distanceKm({ lat: 8, lon: -80 }, { lat: 8, lon: -80 }), 0);
@@ -64,4 +64,12 @@ test('only a depth of exactly 10 km is marked provisional', () => {
   assert.equal(isProvisionalDepth(10), true);
   assert.equal(isProvisionalDepth(10.4), false);
   assert.equal(isProvisionalDepth(null), false);
+});
+
+test('notifications include the estimated S-wave arrival at the query center', () => {
+  const time = Date.UTC(2026, 9, 10, 12, 34, 8); // 07:34:08 in Panama
+  const event = { id: 'us1', source: 'usgs', mag: 4.3, place: 'Tebario', time, distance: 100, depth: 10 };
+  assert.match(newRecordsMessage([event], 'de ti', null, time + 600_000).body, /\nOnda S llegó a ti ≈ 07:34:36$/);
+  assert.match(newRecordsMessage([event], 'del centro de Panamá', null, time + 10_000).body, /\nOnda S llegaría al centro de Panamá ≈ 07:34:36 \(estimado\)$/);
+  assert.equal(arrivalLine({ ...event, distance: undefined }, 'de ti'), '');
 });
