@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { distanceKm, filterEvents, normalize, histogram, changes, HOUR } from '../public/domain.js';
+import { distanceKm, filterEvents, normalize, histogram, changes, twinIds, isProvisionalDepth, HOUR } from '../public/domain.js';
 
 test('surface distance handles same point, dateline and antipodes', () => {
   assert.equal(distanceKm({ lat: 8, lon: -80 }, { lat: 8, lon: -80 }), 0);
@@ -46,4 +46,22 @@ test('initial load and revisions never masquerade as newly published events', ()
   const result = changes(new Map([['existing', 1]]), events);
   assert.deepEqual(result.added.map(e => e.id), ['new']);
   assert.deepEqual(result.revised.map(e => e.id), ['existing']);
+});
+
+test('twin records are flagged only across catalogs, within 20 s and 80 km', () => {
+  const events = [
+    { id: 'up1', source: 'up', lat: 8, lon: -80, time: 100_000 },
+    { id: 'us1', source: 'usgs', lat: 8.3, lon: -80, time: 110_000 },
+    { id: 'up2', source: 'up', lat: 8, lon: -80, time: 105_000 },
+    { id: 'us-far', source: 'usgs', lat: 10, lon: -80, time: 100_000 },
+    { id: 'us-late', source: 'usgs', lat: 8, lon: -80, time: 200_000 },
+  ];
+  assert.deepEqual([...twinIds(events)].sort(), ['up1', 'up2', 'us1']);
+  assert.equal(twinIds(events.filter(e => e.source === 'up')).size, 0);
+});
+
+test('only a depth of exactly 10 km is marked provisional', () => {
+  assert.equal(isProvisionalDepth(10), true);
+  assert.equal(isProvisionalDepth(10.4), false);
+  assert.equal(isProvisionalDepth(null), false);
 });

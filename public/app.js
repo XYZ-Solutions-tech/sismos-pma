@@ -1,4 +1,4 @@
-import { PANAMA, HOUR, REFRESH_MS, SOURCE_LABELS, filterEvents, histogram, changes, magnitudeColor, escapeHTML, displayPlace, findTwin } from './domain.js';
+import { PANAMA, HOUR, REFRESH_MS, SOURCE_LABELS, filterEvents, histogram, changes, magnitudeColor, escapeHTML, displayPlace, findTwin, twinIds, isProvisionalDepth } from './domain.js';
 import { loadEarthquakes, readSettings, saveSettings } from './data.js';
 import { createEarthquakeMap } from './map.js';
 import { WAVE_SPEED, arrivalSeconds, surfaceRadiusKm } from './waves.js';
@@ -60,15 +60,17 @@ function renderDetail(event) {
   const status = { reviewed: 'Revisado', preliminary: 'Preliminar', automatic: 'Automático' }[event.status] || 'Sin estado';
   const twin = findTwin(event, state.events);
   const twinVisible = twin && state.visible.some(e => e.id === twin.id);
-  const twinText = twin ? `También en ${SOURCE_LABELS[twin.source]}: <strong>M ${magText(twin.mag)}</strong> · ${timeFormat.format(twin.time)}` : '';
+  const twinText = twin ? `También en ${SOURCE_LABELS[twin.source]} (probablemente el mismo sismo): <strong>M ${magText(twin.mag)}</strong> · ${timeFormat.format(twin.time)}` : '';
+  const provisional = isProvisionalDepth(event.depth);
   $('detail').innerHTML = `<div class="detail-head"><span>Sismo seleccionado</span><span class="badge">${SOURCE_LABELS[event.source]} · ${status}</span></div>
     <div class="detail-top"><span class="detail-mag" style="--mag-color:${color}"><small>M</small>${magText(event.mag)}</span><div><h3>${escapeHTML(place.title)}</h3><p>${place.region ? `${escapeHTML(place.region)} · ` : ''}${dateFormat.format(event.time)} · ${ago(event.time)}</p></div></div>
     <div class="detail-grid">
       <div><strong>${num.format(event.distance)}<small> km</small></strong><span>${fromWhere()}</span></div>
-      <div><strong>${event.depth === null ? '—' : event.depth.toFixed(1)}<small> km</small></strong><span>de profundidad</span></div>
+      <div><strong>${event.depth === null ? '—' : event.depth.toFixed(1)}<small> km</small></strong><span>${provisional ? 'prof. provisional' : 'de profundidad'}</span></div>
       <div class="tile p" id="tile-p"><strong>+${times.p.toFixed(1)}<small> s</small></strong><span>onda P llegó ${toWhere()}</span></div>
       <div class="tile s" id="tile-s"><strong>+${times.s.toFixed(1)}<small> s</small></strong><span>onda S llegó ${toWhere()}</span></div>
     </div>
+    ${provisional ? '<p class="detail-note">10 km suele ser una profundidad provisional o fijada cuando no se pudo calcular: no es necesariamente una medición exacta. Los tiempos P y S la usan como aproximación.</p>' : ''}
     ${twin ? (twinVisible ? `<button class="twin" data-id="${escapeHTML(twin.id)}"><i style="background:${magnitudeColor(twin.mag)}"></i><span>${twinText}</span></button>` : `<p class="twin"><i style="background:${magnitudeColor(twin.mag)}"></i><span>${twinText}</span></p>`) : ''}
     <div class="detail-bottom"><span>${event.magType ? `Tipo ${escapeHTML(event.magType)}` : 'Tipo de magnitud no informado'} · ${event.felt === null ? 'percepción no informada' : `${num.format(event.felt)} reportes de percepción`}</span><a href="${escapeHTML(event.url)}" target="_blank" rel="noopener noreferrer">Ver ficha ${SOURCE_LABELS[event.source]} ↗</a></div>`;
 }
@@ -82,7 +84,7 @@ function renderSources() {
     $(`source-${id}`).textContent = !source ? `${SOURCE_LABELS[id]}: consultando…` : !source.available ? `${SOURCE_LABELS[id]}: consulta no disponible` :
       `${SOURCE_LABELS[id]}: ${stale ? 'datos anteriores · ' : ''}consultado ${timeFormat.format(source.fetchedAt)} · último en tu consulta ${latest ? dateFormat.format(latest) : 'ninguno'}`;
   }
-  $('count-note').textContent = state.source === 'all' ? 'Un sismo puede tener un registro en cada fuente. Los conteos son registros, no sismos únicos.' : `Mostrando registros de ${SOURCE_LABELS[state.source]}.`;
+  $('count-note').textContent = state.source === 'all' ? 'Un sismo puede tener un registro en cada fuente y aparecer dos veces («también en…»). Los conteos son registros, no sismos únicos.' : `Mostrando registros de ${SOURCE_LABELS[state.source]}.`;
   const sources = activeSources();
   state.stale = sources.some(sourceIsStale);
   if (state.loaded && !state.loading) connection(state.stale ? 'Fuente sin actualizar' : 'Consultas al día', state.stale);
@@ -166,12 +168,17 @@ function render() {
   document.querySelectorAll('[data-ripples]').forEach(button => button.setAttribute('aria-pressed', button.dataset.ripples === state.ripples));
   const available = activeSources().some(source => source.available);
   $('event-count').textContent = available ? state.visible.length : '—';
-  $('list-subtitle').textContent = `${num.format(state.radius)} km · ${periodShort()} · distancias ${fromWhere()}`;
+  // Both catalogs can publish the same earthquake: flag the pairs, never merge or subtract them.
+  const twins = state.source === 'all' ? twinIds(state.visible) : new Set();
+  const pairs = Math.min(...['up', 'usgs'].map(source => state.visible.filter(e => e.source === source && twins.has(e.id)).length));
+  $('list-subtitle').textContent = `${num.format(state.radius)} km · ${periodShort()} · distancias ${fromWhere()}${pairs ? ` · ${pairs} ${pairs === 1 ? 'sismo' : 'sismos'} en ambas fuentes` : ''}`;
   const newIds = new Set(state.newIds.keys());
   $('events').innerHTML = state.visible.length ? state.visible.map(event => {
     const place = displayPlace(event.place);
+    const depth = event.depth === null ? 'prof. —' : isProvisionalDepth(event.depth) ? 'prof. 10 km (prov.)' : `prof. ${num.format(event.depth)} km`;
+    const other = event.source === 'up' ? 'USGS' : 'UP';
     return `<button class="event ${event.id === state.selected ? 'selected' : ''}" data-id="${escapeHTML(event.id)}" aria-pressed="${event.id === state.selected}">
-    <span class="event-mag" style="--mag-color:${magnitudeColor(event.mag)}">${magText(event.mag)}</span><span class="event-info"><span class="event-place">${escapeHTML(place.title)}</span><span class="event-time">${timeFormat.format(event.time)} · ${ago(event.time)}${newIds.has(event.id) ? '<b class="new-tag">Nuevo</b>' : ''}</span><span class="event-meta"><b>${num.format(event.distance)} km</b><span>prof. ${event.depth === null ? '—' : `${num.format(event.depth)} km`}</span><i class="source-tag ${event.source}">${event.source === 'up' ? 'UP' : 'USGS'}${event.status === 'preliminary' ? ' · prelim.' : ''}</i></span></span></button>`;
+    <span class="event-mag" style="--mag-color:${magnitudeColor(event.mag)}">${magText(event.mag)}</span><span class="event-info"><span class="event-place">${escapeHTML(place.title)}</span><span class="event-time">${timeFormat.format(event.time)} · ${ago(event.time)}${newIds.has(event.id) ? '<b class="new-tag">Nuevo</b>' : ''}</span><span class="event-meta"><b>${num.format(event.distance)} km</b><span>${depth}</span><i class="source-tag ${event.source}">${event.source === 'up' ? 'UP' : 'USGS'}${event.status === 'preliminary' ? ' · prelim.' : ''}</i>${twins.has(event.id) ? `<i class="twin-tag" title="Probablemente el mismo sismo que un registro de ${other}">también en ${other}</i>` : ''}</span></span></button>`;
   }).join('') : `<p class="empty">${available ? 'No hay registros publicados que coincidan con estos filtros. Amplía el radio, el período o baja la magnitud mínima.' : state.failed || state.sources.length ? 'La fuente seleccionada no está disponible. Puedes cambiar de fuente o esperar el próximo intento.' : 'Consultando USGS y Geociencias UP…'}</p>`;
   renderDetail(selectedEvent());
   renderLocation();
@@ -216,7 +223,7 @@ function syncPlayer() {
     if (times) {
       const where = state.located ? 'ti' : state.center.label === PANAMA.label ? 'el centro de Panamá' : 'el centro de consulta';
       $('wave-title').textContent = `Ondas del M ${magText(times.event.mag)} hacia ${where}`;
-      $('wave-sub').textContent = `Repetición · ocurrió ${dateFormat.format(times.event.time)} · P ${WAVE_SPEED.p.toFixed(1)} km/s · S ${WAVE_SPEED.s.toFixed(1)} km/s (medias)`;
+      $('wave-sub').textContent = `Repetición educativa, no alerta · ocurrió ${dateFormat.format(times.event.time)} · P ${WAVE_SPEED.p.toFixed(1)} km/s · S ${WAVE_SPEED.s.toFixed(1)} km/s (medias)`;
       $('label-p').textContent = `P ${times.p.toFixed(1)} s`;
       $('label-s').textContent = `S ${times.s.toFixed(1)} s`;
       for (const kind of ['p', 's']) {
@@ -226,7 +233,7 @@ function syncPlayer() {
       }
     } else {
       $('wave-title').textContent = 'Selecciona un sismo';
-      $('wave-sub').textContent = 'Las ondas P y S se dibujan desde el epicentro hasta tu ubicación.';
+      $('wave-sub').textContent = 'Repetición educativa de las ondas P y S desde el epicentro hasta tu ubicación. No es una alerta.';
     }
     $('wave-card').classList.toggle('empty', !times);
   }

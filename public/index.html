@@ -63,7 +63,7 @@
               </button>
               <div class="wave-title">
                 <strong id="wave-title">Selecciona un sismo</strong>
-                <span id="wave-sub">Las ondas P y S se dibujan desde el epicentro hasta tu ubicación.</span>
+                <span id="wave-sub">Repetición educativa de las ondas P y S desde el epicentro hasta tu ubicación. No es una alerta.</span>
               </div>
               <div class="segmented small" role="group" aria-label="Velocidad de repetición">
                 <button data-speed="1" aria-pressed="false">1×</button
@@ -120,7 +120,7 @@
           <div class="legend-row">
             <span><i class="wave-key p"></i>Onda P</span><span><i class="wave-key s"></i>Onda S</span>
           </div>
-          <p>Los anillos de cada sismo muestran energía relativa por magnitud. No representan daños ni intensidad.</p>
+          <p>Anillos y ondas son animaciones educativas, no alertas anticipadas. El anillo muestra energía relativa por magnitud, no daños ni intensidad.</p>
         </div>
 
         <div class="map-provider" id="map-provider">Cargando mapa…</div>
@@ -274,6 +274,27 @@
         <button id="close-about" aria-label="Cerrar explicación">×</button>
       </div>
       <div class="explanation">
+        <article class="caveats">
+          <span class="explain-symbol">!</span>
+          <div>
+            <h3>Antes de interpretar</h3>
+            <ul>
+              <li>
+                Se combinan registros de dos instituciones, Geociencias UP y USGS: el mismo sismo puede aparecer dos
+                veces, con magnitud y ubicación algo distintas. Esos registros se marcan «también en…» y se cuentan por
+                separado.
+              </li>
+              <li>
+                Algunas profundidades de 10 km son provisionales o fijadas cuando no se pudo calcular la profundidad; no
+                son necesariamente mediciones exactas. Se marcan «prov.».
+              </li>
+              <li>
+                Las ondas animadas son representaciones educativas, no alertas anticipadas: se dibujan después de que el
+                catálogo publica el sismo.
+              </li>
+            </ul>
+          </div>
+        </article>
         <article>
           <span class="explain-symbol">M</span>
           <div>
@@ -318,7 +339,8 @@
             <h3>Distancia y profundidad</h3>
             <p>
               La distancia es sobre la superficie, desde tu ubicación o desde el centro de Panamá. La profundidad indica
-              dónde ocurrió la ruptura bajo la superficie.
+              dónde ocurrió la ruptura bajo la superficie. Cuando no se puede calcular, las redes suelen publicar 10 km
+              como valor provisional; el panel lo marca «prov.».
             </p>
           </div>
         </article>

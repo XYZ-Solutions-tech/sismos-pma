@@ -83,6 +83,25 @@ export function findTwin(event, events, maxSeconds = 20, maxKm = 80) {
   return best;
 }
 
+// Ids of the records that have a twin among `events` (same criteria as findTwin). Sorted window, not O(n²).
+export function twinIds(events, maxSeconds = 20, maxKm = 80) {
+  const sorted = [...events].sort((a, b) => a.time - b.time);
+  const ids = new Set();
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length && sorted[j].time - sorted[i].time <= maxSeconds * 1000; j++) {
+      if (sorted[i].source === sorted[j].source || distanceKm(sorted[i], sorted[j]) > maxKm) continue;
+      ids.add(sorted[i].id);
+      ids.add(sorted[j].id);
+    }
+  }
+  return ids;
+}
+
+// Catalogs publish 10 km when the depth could not be resolved (fixed or preliminary): not necessarily a measurement.
+export function isProvisionalDepth(depth) {
+  return depth === 10;
+}
+
 export function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

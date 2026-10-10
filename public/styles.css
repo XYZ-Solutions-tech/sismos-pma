@@ -654,6 +654,14 @@ select {
   border-radius: 5px;
   padding: 0 5px;
 }
+.twin-tag {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--faint);
+  border: 1px dashed #2e444c;
+  border-radius: 5px;
+  padding: 0 5px;
+}
 .empty {
   padding: 20px 12px;
   color: var(--muted);
@@ -836,6 +844,12 @@ select {
 }
 button.twin:hover span {
   text-decoration: underline;
+}
+.detail-note {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--faint);
 }
 .detail-bottom {
   display: flex;
@@ -1393,6 +1407,22 @@ dialog::backdrop {
   line-height: 1.65;
   color: var(--muted);
   margin-bottom: 8px;
+}
+.caveats > div {
+  flex: 1;
+  background: var(--inset);
+  padding: 13px 15px;
+  border-radius: 12px;
+}
+.caveats ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.caveats li + li {
+  margin-top: 6px;
 }
 .privacy {
   background: var(--inset);
