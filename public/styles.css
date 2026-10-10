@@ -1784,3 +1784,19 @@ dialog::backdrop {
 .energy-periods { display: flex; justify-content: space-around; gap: 16px; font-size: 11px; color: var(--muted); margin-bottom: 12px; }
 
 .energy-comparison[data-direction="up"] .energy-totals strong:last-child { color: #e5484d; }
+
+[hidden] { display: none !important; }
+.installation { max-width: 850px; margin: auto; padding: 64px 24px; }
+.installation-eyebrow { color: var(--accent); letter-spacing: .14em; font-size: 12px; margin-top: 24px; }
+.installation h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.1; margin: 20px 0; }
+.installation-intro { font-size: 18px; line-height: 1.6; max-width: 640px; color: var(--muted); }
+.installation .welcome-primary { max-width: 360px; }
+.installation-steps { display: grid; gap: 16px; margin: 32px 0; }
+.installation-steps article { padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; }
+.installation h2 { font-size: 20px; margin: 0 0 16px; }
+.installation p { line-height: 1.6; }
+.installation details { padding: 12px 0; }
+.installation summary { cursor: pointer; color: var(--accent); }
+.installation-note { font-size: 14px; color: var(--muted); }
+.app-update { position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 10000; width: min(440px, calc(100% - 32px)); padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--accent); box-shadow: var(--shadow); display: flex; gap: 16px; align-items: center; }
+.app-update button { background: var(--accent); color: var(--bg); border: 0; border-radius: 10px; padding: 12px; }

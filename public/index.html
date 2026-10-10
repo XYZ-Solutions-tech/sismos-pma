@@ -17,10 +17,30 @@
     <link rel="stylesheet" href="/leaflet.css" />
     <link rel="stylesheet" href="/styles.css" />
     <script src="/leaflet.js" defer></script>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/entry.js"></script>
   </head>
   <body>
-    <main class="workspace">
+    <section id="installation" class="installation" aria-labelledby="installation-title">
+      <img src="/icon-192.png" width="76" height="76" alt="" />
+      <p class="installation-eyebrow">SISMOS PMA · PANAMÁ</p>
+      <h1 id="installation-title">Los sismos de tu zona,<br />en tu pantalla de inicio.</h1>
+      <p class="installation-intro">Consulta el mapa, sigue la frecuencia y la energía de los registros y recibe avisos según tus filtros, incluso con la app cerrada.</p>
+      <button id="landing-install" class="welcome-primary" hidden>Instalar Sismos PMA</button>
+      <div class="installation-steps">
+        <article><h2>1. Instala la app</h2>
+          <details open><summary>iPhone o iPad</summary><p>Abre esta página en Safari. Toca Compartir → Agregar a pantalla de inicio. Si aparece «Abrir como app web», actívalo y toca Agregar.</p></details>
+          <details><summary>Android</summary><p>Abre esta página en Chrome. Toca Instalar Sismos PMA o abre el menú ⋮ → Instalar app / Agregar a pantalla de inicio y confirma.</p></details>
+          <details><summary>Computadora</summary><p>Abre esta página en Chrome o Edge. Usa el ícono de instalación en la barra de direcciones o la opción Instalar en el menú del navegador.</p></details>
+        </article>
+        <article><h2>2. Ábrela desde su ícono</h2><p>Busca Sismos PMA en tu pantalla de inicio o en tus aplicaciones. Al abrirla desde ahí verás el mapa y el panel de actividad.</p></article>
+        <article><h2>3. Activa los avisos</h2><p>Dentro de la app, toca Activar avisos y acepta el permiso. Ajusta tu zona, radio, magnitud y fuente para elegir qué registros recibir.</p></article>
+      </div>
+      <p class="installation-note">Los avisos dependen de la publicación de cada fuente. No garantizan una alerta anticipada en Panamá. Las ondas del mapa son representaciones educativas.</p>
+      <p id="landing-installed" role="status" hidden>Instalación completada. Abre Sismos PMA desde su nuevo ícono.</p>
+      <p class="installation-note">¿Ya la instalaste? Ábrela desde su ícono para entrar al panel.</p>
+    </section>
+    <aside id="app-update" class="app-update" role="status" hidden><span>Nueva versión disponible</span><button id="open-update">Abrir nueva versión</button></aside>
+    <main class="workspace" hidden>
       <section class="map-panel" aria-label="Mapa de sismos">
         <div id="map" aria-label="Mapa de epicentros"></div>
 

@@ -9,7 +9,7 @@ const root = new URL('./', import.meta.url);
 const port = Number(process.env.SISMOS_PORT || 8787);
 const routes = new Map([
   ['/', ['public/index.html', 'text/html']],
-  ...['geoshake.js', 'styles.css', 'app.js', 'domain.js', 'data.js', 'map.js', 'leaflet-map.js', 'google-map.js', 'waves.js', 'overlay.js', 'notify.js', 'sw.js'].map(name => [`/${name}`, [`public/${name}`, name.endsWith('.css') ? 'text/css' : 'text/javascript']]),
+  ...['entry.js', 'updates.js', 'geoshake.js', 'styles.css', 'app.js', 'domain.js', 'data.js', 'map.js', 'leaflet-map.js', 'google-map.js', 'waves.js', 'overlay.js', 'notify.js', 'sw.js'].map(name => [`/${name}`, [`public/${name}`, name.endsWith('.css') ? 'text/css' : 'text/javascript']]),
   ['/manifest.webmanifest', ['public/manifest.webmanifest', 'application/manifest+json']],
   ...['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'].map(name => [`/${name}`, [`public/${name}`, 'image/png']]),
   ['/leaflet.js', ['node_modules/leaflet/dist/leaflet.js', 'text/javascript']],

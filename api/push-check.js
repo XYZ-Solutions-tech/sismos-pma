@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { loadCatalogs } from '../sources/catalogs.mjs';
-import { runPushCheck } from '../sources/push.mjs';
+import { runPushCheck, runReleaseCheck } from '../sources/push.mjs';
 import { pushConfigured, store, sendPush } from '../sources/push-env.mjs';
 
 // Called every minute by the Cloudflare Worker in cron-worker/ (Vercel Hobby cron jobs are daily).
@@ -14,6 +14,7 @@ function authorized(request) {
 export async function GET(request) {
   if (!authorized(request)) return Response.json({ error: 'No autorizado' }, { status: 401 });
   if (!pushConfigured) return Response.json({ error: 'Avisos push no configurados' }, { status: 503 });
+  const updates = await runReleaseCheck({ store, send: sendPush, release: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA });
   const result = await runPushCheck({ store, loadCatalogs, send: sendPush });
-  return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
+  return Response.json({ ...result, updates }, { headers: { 'Cache-Control': 'no-store' } });
 }

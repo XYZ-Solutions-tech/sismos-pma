@@ -53,6 +53,8 @@ export function createRedisStore(redis, { now = Date.now } = {}) {
       for (const event of events) seen.get(source)?.add(event.id);
       return events.filter((_, index) => added[index] === 1);
     },
+    getRelease: () => redis.get('sismos:release'),
+    saveRelease: release => redis.set('sismos:release', release),
     claimDelivery: (id, key) => redis.set(`sismos:delivery:${id}:${key}`, 1, { nx: true, ex: 8 * 86400 }),
     releaseDelivery: (id, key) => redis.del(`sismos:delivery:${id}:${key}`),
     async subscriptions() {
@@ -107,5 +109,27 @@ export async function runPushCheck({ store, loadCatalogs, send, now = Date.now()
       else { result.failed++; console.error(`push ${key}: ${error.statusCode ?? ''} ${error.message}`); }
     }
   }));
+  return result;
+}
+
+// Release notices share subscriptions, but do not use earthquake/location filters.
+export async function runReleaseCheck({ store, send, release }) {
+  const result = { sent: 0, failed: 0 };
+  if (!release) return result;
+  const previous = await store.getRelease();
+  if (!previous) { await store.saveRelease(release); return result; }
+  if (previous === release) return result;
+  await Promise.all((await store.subscriptions()).map(async ({ key, subscription }) => {
+    if (!await store.claimDelivery(`release-${release}`, key)) return;
+    try {
+      await send(subscription, { title: 'Nueva versión disponible', body: 'Toca para abrir la nueva versión de Sismos PMA.',
+        tag: 'app-update', type: 'app-update', release }, { TTL: 86400, urgency: 'normal' });
+      result.sent++;
+    } catch (error) {
+      if (error.statusCode === 404 || error.statusCode === 410) await store.removeSubscription(key);
+      else { await store.releaseDelivery(`release-${release}`, key); result.failed++; }
+    }
+  }));
+  if (!result.failed) await store.saveRelease(release);
   return result;
 }

@@ -6,7 +6,7 @@ import { newRecordsMessage } from './domain.js';
 const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const worker = 'serviceWorker' in navigator
-  ? navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).catch(() => null)
+  ? navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(() => navigator.serviceWorker.ready).catch(() => null)
   : Promise.resolve(null);
 
 // beforeinstallprompt can fire while app.js is still awaiting the map, so capture it on import.
