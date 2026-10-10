@@ -45,11 +45,12 @@ export function filterEvents(events, options, now = Date.now()) {
 export function histogram(events, hours, now = Date.now(), count = 24) {
   const start = now - hours * HOUR;
   const width = hours * HOUR / count;
-  const bins = Array.from({ length: count }, (_, index) => ({ time: start + index * width, count: 0, maxMag: null }));
+  const bins = Array.from({ length: count }, (_, index) => ({ time: start + index * width, count: 0, maxMag: null, energy: 0 }));
   for (const event of events) {
     if (event.time < start || event.time > now) continue;
     const index = Math.min(count - 1, Math.floor((event.time - start) / width));
     bins[index].count++;
+    bins[index].energy += energyJoules(event.mag);
     if (event.mag !== null) bins[index].maxMag = Math.max(bins[index].maxMag ?? -Infinity, event.mag);
   }
   return bins;
@@ -103,20 +104,78 @@ export function isProvisionalDepth(depth) {
 }
 
 const kmFormat = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
+const decimalFormat = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 });
+const ratioFormat = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
 const clockFormat = new Intl.DateTimeFormat('es-PA', { timeZone: 'America/Panama', hour: '2-digit', minute: '2-digit', hour12: false });
+
+// ——— Energy and trend ———
+
+// Approximate radiated energy, Gutenberg–Richter: log10 E(J) = 1.5 M + 4.8. One magnitude unit ≈ 32× the energy.
+export const energyJoules = mag => (mag === null ? 0 : 10 ** (1.5 * mag + 4.8));
+
+// One record per earthquake for sums and trends: a quake published by both catalogs counts once,
+// with the USGS record (twins always pair a UP record with a USGS one).
+export function uniqueEvents(events) {
+  const twins = twinIds(events);
+  return twins.size ? events.filter(event => !(event.source === 'up' && twins.has(event.id))) : events;
+}
+
+// Earthquakes and energy in the last `window` and in the one before. ratio is null when the
+// previous window had no energy (nothing to compare with).
+export function energyTrend(events, window = HOUR, now = Date.now()) {
+  const span = (from, to) => events.filter(event => event.time > from && event.time <= to).reduce((sum, event) => ({
+    count: sum.count + 1, energy: sum.energy + energyJoules(event.mag), maxMag: Math.max(sum.maxMag ?? -Infinity, event.mag ?? -Infinity),
+  }), { count: 0, energy: 0, maxMag: null });
+  const current = span(now - window, now);
+  const previous = span(now - 2 * window, now - window);
+  return { current, previous, ratio: previous.energy ? current.energy / previous.energy : null };
+}
+
+// 'up' | 'down' | 'same' | 'none'. Energy varies by orders of magnitude, so within ×2 counts as similar.
+export function trendDirection({ current, previous, ratio }) {
+  if (!current.energy && !previous.energy) return 'none';
+  if (ratio === null) return 'up';
+  return ratio >= 2 ? 'up' : ratio <= 0.5 ? 'down' : 'same';
+}
+
+// A sharp rise worth saying in a notification: ≥10× a previous window that also had earthquakes, with an M 4+.
+// After a quiet window the record notification itself (with its magnitude) says enough.
+export const energyJump = trend => trend.ratio !== null && trend.ratio >= 10 && (trend.current.maxMag ?? -Infinity) >= 4;
+
+const SUPERSCRIPT = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+export function formatEnergy(joules) {
+  if (!joules) return '0 J';
+  let exponent = Math.floor(Math.log10(joules));
+  let mantissa = Math.round(joules / 10 ** exponent * 100) / 100;
+  if (mantissa >= 10) { mantissa /= 10; exponent++; }
+  return `${decimalFormat.format(mantissa)} × 10${String(exponent).replace('-', '⁻').replace(/\d/g, digit => SUPERSCRIPT[digit])} J`;
+}
+
+export const formatRatio = ratio => `${ratio >= 100 ? kmFormat.format(ratio) : ratioFormat.format(ratio)}×`;
+
+// TNT equivalent (1 t = 4.184 × 10⁹ J), only to give the energy a familiar scale.
+export function formatTNT(joules) {
+  const tons = joules / 4.184e9;
+  if (tons < 1) return 'menos de 1 t de TNT';
+  if (tons < 1000) return `${kmFormat.format(tons)} t de TNT`;
+  if (tons < 1e6) return `${ratioFormat.format(tons / 1000)} kt de TNT`;
+  return `${ratioFormat.format(tons / 1e6)} Mt de TNT`;
+}
 
 // One notification per check for the new records of a query (local or Web Push).
 // `events` come from filterEvents (with `distance`); the tag lets a push replace the local one.
-export function newRecordsMessage(events, fromWhere) {
+// With `jump` (an energyTrend that passed energyJump) the title announces the rise.
+export function newRecordsMessage(events, fromWhere, jump = null) {
   const top = events.reduce((best, e) => ((e.mag ?? -Infinity) > (best.mag ?? -Infinity) ? e : best));
   const mag = top.mag === null ? '—' : top.mag.toFixed(1);
   const place = displayPlace(top.place).title;
   const where = `${kmFormat.format(top.distance)} km ${fromWhere}`;
   const tag = `sismo-${top.id}`;
-  if (events.length === 1) {
-    return { title: `Sismo M ${mag} · ${SOURCE_LABELS[top.source]}`, body: `${place}\n${where} · ${clockFormat.format(top.time)} (hora de Panamá)`, id: top.id, tag };
-  }
-  return { title: `${events.length} nuevos registros en tu zona`, body: `Mayor: M ${mag} · ${place}\n${where} · ${SOURCE_LABELS[top.source]}`, id: top.id, tag };
+  const message = events.length === 1
+    ? { title: `Sismo M ${mag} · ${SOURCE_LABELS[top.source]}`, body: `${place}\n${where} · ${clockFormat.format(top.time)} (hora de Panamá)`, id: top.id, tag }
+    : { title: `${events.length} nuevos registros en tu zona`, body: `Mayor: M ${mag} · ${place}\n${where} · ${SOURCE_LABELS[top.source]}`, id: top.id, tag };
+  if (!jump) return message;
+  return { ...message, title: `↑ Energía: ${formatRatio(jump.ratio)} la hora anterior`, body: `${message.title}\n${message.body}` };
 }
 
 export function escapeHTML(value) {

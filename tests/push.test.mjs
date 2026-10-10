@@ -116,3 +116,20 @@ test('subscription filters apply distance from a stored location and the period'
   assert.equal(sent[0].id, 'us-new');
   assert.match(sent[0].body, /km del centro de Panamá/);
 });
+
+test('an energy jump is announced in the push title once an hour per subscriber', async () => {
+  const store = createRedisStore(fakeRedis(), { now: () => NOW });
+  const sent = [];
+  const send = async (subscription, message) => sent.push(message);
+  await subscribe(store, 'https://fcm.googleapis.com/fcm/send/all');
+  const before = [quake('us-b1', { mag: 3.2, time: NOW - 70 * 60_000 }), quake('us-b2', { mag: 3.4, time: NOW - 80 * 60_000 })];
+  await runPushCheck({ store, send, now: NOW, loadCatalogs: catalogs(before) });
+  const big = quake('us-big', { mag: 5.6, time: NOW - 5 * 60_000 });
+  await runPushCheck({ store, send, now: NOW, loadCatalogs: catalogs([...before, big]) });
+  const next = quake('us-next', { mag: 4.1, time: NOW - 2 * 60_000 });
+  await runPushCheck({ store, send, now: NOW + 60_000, loadCatalogs: catalogs([...before, big, next]) });
+  assert.match(sent[0].title, /^↑ Energía: [\d.,]+× la hora anterior$/);
+  assert.match(sent[0].body, /^Sismo M 5\.6 · USGS\n/);
+  assert.equal(sent[1].title, 'Sismo M 4.1 · USGS');
+  assert.equal((await store.subscriptions())[0].jumpAt, NOW);
+});

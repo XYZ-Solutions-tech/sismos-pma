@@ -1,4 +1,5 @@
-import { PANAMA, HOUR, REFRESH_MS, SOURCE_LABELS, filterEvents, histogram, changes, magnitudeColor, escapeHTML, displayPlace, findTwin, twinIds, isProvisionalDepth } from './domain.js';
+import { PANAMA, HOUR, REFRESH_MS, SOURCE_LABELS, filterEvents, histogram, changes, magnitudeColor, escapeHTML, displayPlace, findTwin, twinIds, isProvisionalDepth,
+  uniqueEvents, energyTrend, trendDirection, energyJump, formatEnergy, formatRatio, formatTNT } from './domain.js';
 import { loadEarthquakes, readSettings, saveSettings } from './data.js';
 import { createEarthquakeMap } from './map.js';
 import { WAVE_SPEED, arrivalSeconds, surfaceRadiusKm } from './waves.js';
@@ -205,18 +206,72 @@ function render() {
   });
   if (state.fitNext && state.loaded) { map.fit(state.visible, state.center); state.fitNext = false; }
   renderActivity(now);
+  renderTrend(now);
   renderSources();
   renderNotify();
   syncPlayer();
 }
 
+// ——— Frequency and energy trend (one record per earthquake) ———
+
+const sismos = count => `${count} ${count === 1 ? 'sismo' : 'sismos'}`;
+// The last window against the previous one, in words. `before` names the previous window.
+function trendSummary(trend, before) {
+  const { current, previous, ratio } = trend;
+  const direction = trendDirection(trend);
+  const arrow = { up: '↑', down: '↓', same: '→', none: '·' }[direction];
+  const change = direction === 'none' ? 'sin sismos en ambas'
+    : ratio === null ? `sube (${before}: sin sismos)`
+    : !current.energy ? `sin sismos (${before}: ${sismos(previous.count)})`
+    : ratio >= 1 ? `${formatRatio(ratio)} ${before}` : `${formatRatio(1 / ratio)} menos que ${before}`;
+  const short = direction === 'none' ? 'sin sismos' : ratio === null ? 'sube' : !current.energy ? 'sin sismos'
+    : ratio >= 1 ? formatRatio(ratio) : `${formatRatio(1 / ratio)} menos`;
+  return { direction, arrow, change, short, counts: `${sismos(current.count)} (antes ${previous.count})` };
+}
+
+function renderTrend(now) {
+  const card = $('trend-card');
+  if (!activeSources().some(source => source.available)) {
+    card.dataset.trend = 'none';
+    $('trend-arrow').textContent = '·';
+    $('trend-detail').textContent = 'Esperando los catálogos…';
+    $('activity-trend').innerHTML = '';
+    return;
+  }
+  // Ignores the period filter: always the last hours, with radius, magnitude and source.
+  const recent = uniqueEvents(filterEvents(state.events, { ...state, hours: 12 }, now));
+  const hour = energyTrend(recent, HOUR, now);
+  const six = energyTrend(recent, 6 * HOUR, now);
+  const h = trendSummary(hour, 'la hora anterior');
+  const s = trendSummary(six, 'las 6 h anteriores');
+  card.dataset.trend = h.direction;
+  $('trend-arrow').textContent = h.arrow;
+  $('trend-title').textContent = h.direction === 'none' ? 'Energía: sin sismos en las últimas 2 horas' : `Energía: ${h.change}`;
+  $('trend-detail').textContent = h.direction === 'none' ? `6 h: ${s.arrow} ${s.short}`
+    : `${formatEnergy(hour.current.energy)} · ${h.counts} · 6 h: ${s.arrow} ${s.short}`;
+  card.setAttribute('aria-label', `${$('trend-title').textContent}. Ver frecuencia y energía`);
+  $('activity-trend').innerHTML = [[hour, h, 'Última hora'], [six, s, 'Últimas 6 h']].map(([trend, summary, label]) =>
+    `<div class="trend-row" data-trend="${summary.direction}"><span>${label}</span><strong>${formatEnergy(trend.current.energy)}${trend.current.energy ? ` · ${formatTNT(trend.current.energy)}` : ''}</strong><small><b>${summary.arrow} ${escapeHTML(summary.change)}</b> · ${summary.counts}</small></div>`).join('');
+}
+
 function renderActivity(now) {
-  const bins = histogram(state.visible, state.hours, now);
+  const unique = uniqueEvents(state.visible);
+  const bins = histogram(unique, state.hours, now);
   const max = Math.max(1, ...bins.map(bin => bin.count));
-  $('chart').innerHTML = bins.map(bin => `<div class="chart-column" title="${dateFormat.format(bin.time)}: ${bin.count} registros"><span class="bar-count">${bin.count || ''}</span><div class="bar" style="height:${bin.count / max * 75}px;background:${magnitudeColor(bin.maxMag)}"></div></div>`).join('');
-  $('chart').setAttribute('aria-label', `${state.visible.length} registros en ${periodText()}, repartidos en 24 intervalos. Máximo de ${Math.max(0, ...bins.map(b => b.count))} registros por intervalo.`);
-  $('activity-subtitle').textContent = state.hours === 24 ? 'Registros por hora dentro de tu consulta' : state.hours === 1 ? 'Registros cada 2,5 minutos dentro de tu consulta' : 'Registros cada 7 horas dentro de tu consulta';
-  $('last-hour').textContent = state.visible.filter(e => e.time >= now - HOUR).length;
+  $('chart').innerHTML = bins.map(bin => `<div class="chart-column" title="${dateFormat.format(bin.time)}: ${sismos(bin.count)} · ${formatEnergy(bin.energy)}"><span class="bar-count">${bin.count || ''}</span><div class="bar" style="height:${bin.count / max * 75}px;background:${magnitudeColor(bin.maxMag)}"></div></div>`).join('');
+  // Energy spans orders of magnitude: log scale, empty intervals on the baseline.
+  const logs = bins.filter(bin => bin.energy > 0).map(bin => Math.log10(bin.energy));
+  const low = Math.min(...logs) - 0.5;
+  const high = Math.max(...logs);
+  const points = bins.map((bin, index) => {
+    const share = !bin.energy ? 0 : high - low < 0.01 ? 0.8 : (Math.log10(bin.energy) - low) / (high - low);
+    return `${((index + 0.5) / bins.length * 240).toFixed(1)},${(100 - share * 92).toFixed(1)}`;
+  });
+  $('energy-line').innerHTML = logs.length ? `<polyline points="${points.join(' ')}" />` : '';
+  const total = bins.reduce((sum, bin) => sum + bin.energy, 0);
+  $('chart').setAttribute('aria-label', `${sismos(unique.length)} en ${periodText()}, energía total ${formatEnergy(total)}, repartidos en 24 intervalos. Máximo de ${Math.max(0, ...bins.map(b => b.count))} por intervalo.`);
+  $('activity-subtitle').textContent = state.hours === 24 ? 'Sismos y energía por hora dentro de tu consulta' : state.hours === 1 ? 'Sismos y energía cada 2,5 minutos dentro de tu consulta' : 'Sismos y energía cada 7 horas dentro de tu consulta';
+  $('last-hour').textContent = unique.filter(e => e.time >= now - HOUR).length;
   $('chart-start').textContent = state.hours === 1 ? 'Hace 1 hora' : state.hours === 24 ? 'Hace 24 horas' : 'Hace 7 días';
   $('chart-middle').textContent = state.hours === 1 ? 'Hace 30 min' : state.hours === 24 ? 'Hace 12 horas' : 'Hace 3,5 días';
 }
@@ -438,13 +493,18 @@ async function refresh() {
     const addedEvents = filterEvents(diff.added, state);
     const addedHere = addedEvents.length;
     const revisedHere = filterEvents(diff.revised, state).length;
+    // A sharp energy rise is said once an hour, in the notice and in the notification title.
+    const hourTrend = energyTrend(uniqueEvents(filterEvents(state.events, { ...state, hours: 2 })), HOUR);
+    const jump = addedHere && energyJump(hourTrend) && !(state.jumpAt > Date.now() - HOUR) ? hourTrend : null;
+    if (jump) state.jumpAt = Date.now();
     if (state.stale) notice(activeSources().filter(sourceIsStale).map(source => source.error || `${source.label}: datos sin actualizar`).join('. ') + '. Se muestran los datos disponibles de cada fuente.', 'warning');
+    else if (jump) notice(`${addedHere} ${addedHere === 1 ? 'nuevo registro' : 'nuevos registros'} en tu zona. La energía de la última hora es ${formatRatio(jump.ratio)} la de la hora anterior.`, 'warning');
     else if (addedHere) notice(`${addedHere} ${addedHere === 1 ? 'nuevo registro publicado' : 'nuevos registros publicados'} en tu zona. Resaltados durante 5 minutos.`);
     else if (revisedHere) notice(`Las fuentes revisaron ${revisedHere} ${revisedHere === 1 ? 'registro' : 'registros'} de esta consulta.`);
     else notice('');
     connection(state.stale ? 'Fuente sin actualizar' : 'Consultas al día', state.stale);
     render();
-    if (state.notify) notifyNewRecords(addedEvents, fromWhere());
+    if (state.notify) notifyNewRecords(addedEvents, fromWhere(), jump);
   } catch (error) {
     state.failed = true;
     state.stale = true;
@@ -523,6 +583,7 @@ $('satellite').addEventListener('click', () => { state.satellite = !state.satell
 $('about-button').addEventListener('click', () => $('about').showModal());
 $('close-about').addEventListener('click', () => $('about').close());
 $('activity-button').addEventListener('click', () => $('activity-dialog').showModal());
+$('trend-card').addEventListener('click', () => $('activity-dialog').showModal());
 $('close-activity').addEventListener('click', () => $('activity-dialog').close());
 $('locate').addEventListener('click', () => locate());
 $('reset-location').addEventListener('click', () => { state.center = { ...PANAMA }; state.located = null; state.fitNext = true; notice(''); render(); syncPush(); });

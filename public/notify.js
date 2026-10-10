@@ -51,9 +51,9 @@ export async function showNotification(title, body, data = {}, tag) {
 }
 
 // `events` come from filterEvents (with `distance`); one notification per check.
-export function notifyNewRecords(events, fromWhere) {
+export function notifyNewRecords(events, fromWhere, jump = null) {
   if (!events.length) return;
-  const { title, body, id, tag } = newRecordsMessage(events, fromWhere);
+  const { title, body, id, tag } = newRecordsMessage(events, fromWhere, jump || null);
   return showNotification(title, body, { id }, tag);
 }
 

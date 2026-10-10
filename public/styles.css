@@ -456,6 +456,66 @@ h1 {
   font-size: 10px;
   color: var(--dim);
 }
+/* Energy trend: last hour vs the one before. Red up, green down. */
+.trend-card {
+  margin: 8px 18px 0;
+  width: calc(100% - 36px);
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--inset);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.trend-card:hover {
+  background: #1a2c33;
+}
+.trend-arrow {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 700;
+  background: var(--chip);
+  color: var(--faint);
+}
+.trend-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.trend-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.trend-text span {
+  font-size: 11px;
+  color: var(--faint);
+}
+.trend-more {
+  color: var(--dim);
+  font-size: 18px;
+}
+[data-trend="up"] .trend-arrow,
+.trend-row[data-trend="up"] b {
+  color: #ff8a8d;
+}
+[data-trend="up"] .trend-arrow {
+  background: rgb(229 72 77 / 18%);
+}
+[data-trend="down"] .trend-arrow,
+.trend-row[data-trend="down"] b {
+  color: var(--p);
+}
+[data-trend="down"] .trend-arrow {
+  background: rgb(63 216 176 / 14%);
+}
 .toolbar {
   padding: 12px 18px 0;
   display: flex;
@@ -1490,6 +1550,85 @@ dialog::backdrop {
   justify-content: space-between;
   margin-top: 10px;
   font-size: 10px;
+  color: var(--faint);
+}
+.trend-rows {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+.trend-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 2px 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--inset);
+  font-size: 12px;
+}
+.trend-row > span:first-child {
+  grid-row: span 2;
+  color: var(--faint);
+  font-size: 11px;
+}
+.trend-row strong {
+  font-weight: 600;
+}
+.trend-row b {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.trend-row small {
+  color: var(--faint);
+  font-size: 11px;
+}
+.chart-wrap {
+  position: relative;
+}
+.energy-line {
+  position: absolute;
+  inset: 15px 0 1px;
+  width: 100%;
+  height: calc(100% - 16px);
+  overflow: visible;
+  pointer-events: none;
+}
+.energy-line polyline {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.9;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--faint);
+}
+.chart-legend i {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.legend-bars {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #7fa9b3 50%, #f08c4a 50%);
+}
+.legend-line {
+  width: 16px;
+  height: 2px;
+  background: var(--ink);
+}
+.chart-note {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.5;
   color: var(--faint);
 }
 

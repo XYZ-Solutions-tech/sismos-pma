@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { PANAMA, HOUR, normalize, filterEvents, newRecordsMessage } from '../public/domain.js';
+import { PANAMA, HOUR, normalize, filterEvents, newRecordsMessage, uniqueEvents, energyTrend, energyJump } from '../public/domain.js';
 
 const SUBSCRIPTIONS = 'sismos:subs';
 const seenKey = source => `sismos:seen:${source}`;
@@ -63,6 +63,11 @@ export function createRedisStore(redis, { now = Date.now } = {}) {
       return true;
     },
     removeSubscription: key => redis.hdel(SUBSCRIPTIONS, key),
+    // Remembers when this subscriber was last told about an energy jump (once an hour).
+    async markJump(key, record, at) {
+      const { subscription, filters, updatedAt } = record;
+      await redis.hset(SUBSCRIPTIONS, { [key]: { subscription, filters, updatedAt, jumpAt: at } });
+    },
   };
 }
 
@@ -82,11 +87,17 @@ export async function runPushCheck({ store, loadCatalogs, send, now = Date.now()
   }
   const result = { fresh: fresh.length, sent: 0, removed: 0, failed: 0 };
   if (!fresh.length) return result;
-  await Promise.all((await store.subscriptions()).map(async ({ key, subscription, filters }) => {
-    const matches = filterEvents(fresh, { ...filters, center: { lat: filters.lat, lon: filters.lon } }, now);
+  await Promise.all((await store.subscriptions()).map(async record => {
+    const { key, subscription, filters } = record;
+    const center = { lat: filters.lat, lon: filters.lon };
+    const matches = filterEvents(fresh, { ...filters, center }, now);
     if (!matches.length) return;
+    // Energy of the last hour against the previous one, same filters, one record per earthquake.
+    const trend = energyTrend(uniqueEvents(filterEvents(events, { ...filters, hours: 2, center }, now)), HOUR, now);
+    const jump = energyJump(trend) && !(record.jumpAt > now - HOUR) ? trend : null;
     try {
-      await send(subscription, newRecordsMessage(matches, filters.located ? 'de ti' : 'del centro de Panamá'));
+      await send(subscription, newRecordsMessage(matches, filters.located ? 'de ti' : 'del centro de Panamá', jump));
+      if (jump) await store.markJump(key, record, now);
       result.sent++;
     } catch (error) {
       // 404/410: the browser dropped the subscription.

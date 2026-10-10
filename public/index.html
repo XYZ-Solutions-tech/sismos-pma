@@ -169,6 +169,15 @@
           <div class="sparkline-axis mono"><span id="spark-start">hace 24 h</span><span id="spark-middle">hace 12 h</span><span>ahora</span></div>
         </section>
 
+        <button class="trend-card" id="trend-card" aria-describedby="trend-detail">
+          <span class="trend-arrow" id="trend-arrow" aria-hidden="true">→</span>
+          <span class="trend-text">
+            <strong id="trend-title">Energía · última hora</strong>
+            <span id="trend-detail">Calculando…</span>
+          </span>
+          <span class="trend-more" aria-hidden="true">›</span>
+        </button>
+
         <section class="toolbar" aria-label="Filtros de consulta">
           <div class="segmented periods" role="group" aria-label="Período">
             <button data-hours="1" aria-pressed="false">Última hora</button
@@ -255,17 +264,27 @@
       <section class="activity" aria-labelledby="activity-title">
         <div class="activity-heading">
           <div>
-            <h2 id="activity-title">El ritmo de la actividad</h2>
-            <p id="activity-subtitle">Registros por hora dentro de tu consulta</p>
+            <h2 id="activity-title">Frecuencia y energía</h2>
+            <p id="activity-subtitle">Sismos por hora dentro de tu consulta</p>
           </div>
           <div class="activity-summary">
-            <strong id="last-hour">—</strong><span>registros en la última hora</span>
+            <strong id="last-hour">—</strong><span>sismos en la última hora</span>
           </div>
         </div>
-        <div class="chart" id="chart" role="img" aria-label="Gráfica de actividad sísmica"></div>
+        <div class="trend-rows" id="activity-trend" aria-live="polite"></div>
+        <div class="chart-wrap">
+          <div class="chart" id="chart" role="img" aria-label="Gráfica de frecuencia y energía"></div>
+          <svg class="energy-line" id="energy-line" viewBox="0 0 240 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
         <div class="chart-axis">
           <span id="chart-start">Hace 24 horas</span><span id="chart-middle">Hace 12 horas</span><span>Ahora</span>
         </div>
+        <div class="chart-legend"><span><i class="legend-bars"></i>Sismos por intervalo (color: mayor magnitud)</span><span><i class="legend-line"></i>Energía (escala logarítmica)</span></div>
+        <p class="chart-note">
+          Energía aproximada con log₁₀ E = 1,5 M + 4,8 (julios): cada unidad de magnitud libera unas 32 veces más energía,
+          así que un solo sismo grande domina la suma. Con ambas fuentes, un sismo publicado por las dos se cuenta una
+          vez (registro de USGS). Describe lo registrado hasta ahora; no predice si vendrán más sismos.
+        </p>
       </section>
     </dialog>
     <dialog id="about">
