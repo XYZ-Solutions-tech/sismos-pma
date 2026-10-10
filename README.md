@@ -45,6 +45,8 @@ Abre http://localhost:8787. El servidor escucha exclusivamente en 127.0.0.1 y so
 
 Proyecto `xyzsolutions/sismos-pma`, dominio `sismos-pma.xyzsolutions.tech` (DNS en Cloudflare: CNAME `sismos-pma` → valor indicado por Vercel, sin proxy). `npm run build` copia `public/` y Leaflet a `dist/`; `api/earthquakes.js` y `api/map-config.js` son las funciones equivalentes al servidor local. La respuesta de sismos se comparte en la CDN 15 s (`Vercel-CDN-Cache-Control`); el navegador no la guarda. La CSP y demás cabeceras están en `vercel.json`. `.vercelignore` excluye `.runtime/` (clave local y logs).
 
+El repositorio https://github.com/XYZ-Solutions-tech/sismos-pma está conectado al proyecto: cada push a `main` publica en producción y cada rama o pull request genera una vista previa. Para publicar sin pasar por Git:
+
 ```sh
 vercel deploy --prod --scope xyzsolutions
 ```
