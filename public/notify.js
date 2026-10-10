@@ -78,7 +78,9 @@ export async function enablePush(filters) {
     const key = keyBytes(publicKey);
     let subscription = await registration.pushManager.getSubscription();
     if (subscription && !sameKey(subscription.options.applicationServerKey, key)) { await subscription.unsubscribe(); subscription = null; }
-    subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    // Some browsers never answer when their push service is off (e.g. Brave by default): give up after 15 s.
+    subscription ??= await Promise.race([registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Servicio push sin respuesta')), 15_000))]);
     return await savePush(subscription, filters());
   } catch { return false; }
 }
