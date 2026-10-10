@@ -1,0 +1,6 @@
+.runtime
+.claude
+dist
+node_modules
+tests
+*.command

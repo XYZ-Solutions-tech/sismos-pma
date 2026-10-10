@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b171c" />
+    <meta name="color-scheme" content="dark" />
+    <title>Sismos cerca de ti · Panamá</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23e8eef0'/%3E%3Cpath d='M4 22h9l4-12 6 22 4-10h9' fill='none' stroke='%230b171c' stroke-width='3'/%3E%3C/svg%3E"
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Sismos PMA" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <link rel="stylesheet" href="/leaflet.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/leaflet.js" defer></script>
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main class="workspace">
+      <section class="map-panel" aria-label="Mapa de sismos">
+        <div id="map" aria-label="Mapa de epicentros"></div>
+
+        <div class="map-toolbar">
+          <div class="segmented wave-modes" role="group" aria-label="Ondas en el mapa">
+            <span class="segmented-label">Ondas</span
+            ><button data-ripples="all" aria-pressed="true">Todas</button
+            ><button data-ripples="hour" aria-pressed="false">Última hora</button
+            ><button data-ripples="none" aria-pressed="false">Ninguna</button>
+          </div>
+          <div class="tool-group">
+            <button id="zoom-in" class="tool" aria-label="Acercar" title="Acercar">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg></button
+            ><button id="zoom-out" class="tool" aria-label="Alejar" title="Alejar">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12" /></svg></button
+            ><button id="center-map" class="tool accent" aria-label="Centrar en tu ubicación" title="Centrar en tu ubicación">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="5.5" /><circle cx="10" cy="10" r="1.8" class="filled" /><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" /></svg></button
+            ><button id="fit-map" class="tool" aria-label="Ver todos los sismos" title="Ver todos los sismos">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" /></svg></button
+            ><button id="satellite" class="tool text" aria-pressed="false">Satélite</button>
+          </div>
+        </div>
+
+        <div class="map-error" id="map-error" role="status" hidden>
+          El mapa base no está disponible. Los eventos siguen visibles en la lista.
+        </div>
+
+        <article class="detail" id="detail" hidden aria-label="Detalle del sismo seleccionado"></article>
+
+        <section class="wave-card" id="wave-card" aria-label="Ondas y repetición">
+          <div class="wave-tabs" role="tablist" aria-label="Modo">
+            <button role="tab" id="tab-waves" aria-selected="true" aria-controls="wave-panel">Ondas hacia ti</button
+            ><button role="tab" id="tab-replay" aria-selected="false" aria-controls="replay-panel">Reproducir el día</button>
+          </div>
+          <div id="wave-panel" role="tabpanel" aria-labelledby="tab-waves">
+            <div class="wave-row">
+              <button id="wave-play" class="play" aria-label="Pausar repetición">
+                <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" /></svg>
+                <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" /></svg>
+              </button>
+              <div class="wave-title">
+                <strong id="wave-title">Selecciona un sismo</strong>
+                <span id="wave-sub">Las ondas P y S se dibujan desde el epicentro hasta tu ubicación.</span>
+              </div>
+              <div class="segmented small" role="group" aria-label="Velocidad de repetición">
+                <button data-speed="1" aria-pressed="false">1×</button
+                ><button data-speed="4" aria-pressed="true">4×</button
+                ><button data-speed="10" aria-pressed="false">10×</button>
+              </div>
+              <output id="wave-time" class="mono">+0.0 s</output>
+            </div>
+            <div class="track" aria-hidden="true">
+              <span class="track-base"></span><span class="track-fill" id="wave-fill"></span>
+              <span class="track-mark p" id="mark-p"></span><span class="track-label p" id="label-p"></span>
+              <span class="track-mark s" id="mark-s"></span><span class="track-label s" id="label-s"></span>
+              <span class="track-zero">0 s</span>
+              <span class="track-head" id="wave-head"></span>
+            </div>
+          </div>
+          <div id="replay-panel" role="tabpanel" aria-labelledby="tab-replay" hidden>
+            <div class="wave-row">
+              <button id="replay-play" class="play" aria-label="Pausar">
+                <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" /></svg>
+                <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" /></svg>
+              </button>
+              <div class="wave-title">
+                <strong id="replay-clock" class="mono">--:--</strong>
+                <span id="replay-sub">0 registros hasta esta hora</span>
+              </div>
+              <div class="segmented small" role="group" aria-label="Duración de la repetición">
+                <button data-duration="20" aria-pressed="false">Rápida</button
+                ><button data-duration="60" aria-pressed="true">Normal</button
+                ><button data-duration="180" aria-pressed="false">Lenta</button>
+              </div>
+              <button id="replay-top" class="link-button">Ir al mayor</button>
+            </div>
+            <div class="bins-wrap">
+              <div class="bins" id="replay-bins" role="group" aria-label="Línea de tiempo del período: toca una barra para saltar"></div>
+              <span class="bins-head" id="replay-head"></span>
+            </div>
+            <div class="bins-axis mono"><span id="replay-start"></span><span id="replay-middle"></span><span id="replay-end">ahora</span></div>
+          </div>
+        </section>
+
+        <div class="legend" aria-label="Leyenda del mapa">
+          <div class="legend-row">
+            <span><i class="mag-key" style="--k: #7fa9b3; --s: 9px"></i>&lt;4</span
+            ><span><i class="mag-key" style="--k: #e9c46a; --s: 11px"></i>4–4,9</span
+            ><span><i class="mag-key" style="--k: #f08c4a; --s: 13px"></i>5–5,9</span
+            ><span><i class="mag-key" style="--k: #e5484d; --s: 15px"></i>6+</span>
+          </div>
+          <div class="legend-row">
+            <span><i class="shape-key"></i>Geociencias UP</span
+            ><span><i class="shape-key usgs"></i>USGS</span
+            ><span><i class="me-key"></i>Tú</span>
+          </div>
+          <div class="legend-row">
+            <span><i class="wave-key p"></i>Onda P</span><span><i class="wave-key s"></i>Onda S</span>
+          </div>
+          <p>Los anillos de cada sismo muestran energía relativa por magnitud. No representan daños ni intensidad.</p>
+        </div>
+
+        <div class="map-provider" id="map-provider">Cargando mapa…</div>
+      </section>
+
+      <aside class="event-panel" aria-label="Sismos registrados">
+        <header class="masthead">
+          <div class="brand">
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+              <rect width="44" height="44" rx="12" />
+              <path d="M7 24h8l4-12 6 21 4-9h8" />
+            </svg>
+            <div>
+              <h1>Sismos cerca de ti</h1>
+              <p id="region-name">Panamá y alrededores</p>
+            </div>
+            <button id="refresh" class="tool" aria-label="Actualizar sismos" title="Actualizar ahora">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14 3.5v3h-3" /></svg>
+            </button>
+          </div>
+          <div class="status-row">
+            <span class="connection" id="connection"><i></i><span>Consultando fuentes</span></span>
+            <button id="notify" class="link-button notify-button" aria-pressed="false" title="Notificaciones locales de nuevos registros según tus filtros">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path class="bell" d="M10 3a4.5 4.5 0 0 0-4.5 4.5v3L4 13.5h12l-1.5-3v-3A4.5 4.5 0 0 0 10 3z" /><path d="M8.2 16a1.9 1.9 0 0 0 3.6 0" /></svg><span>Activar avisos</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="location-card" id="location-card" aria-live="polite">
+          <span class="location-key"></span>
+          <div>
+            <strong id="location-title">Centro de Panamá</strong>
+            <span id="location-sub">Activa tu ubicación para medir distancias y ondas desde ti.</span>
+          </div>
+          <button id="locate" class="link-button">Usar mi ubicación</button
+          ><button id="reset-location" class="link-button" hidden>Usar Panamá</button>
+        </section>
+
+        <section class="stats" aria-label="Resumen del período">
+          <div class="stat-grid">
+            <div><strong id="stat-count" class="mono">—</strong><span id="stat-period">registros · 24 h</span></div>
+            <button id="stat-max" class="stat-button" disabled><strong id="stat-max-value" class="mono">—</strong><span id="stat-max-time">mayor</span></button>
+            <div><strong id="stat-hour" class="mono">—</strong><span>en la última hora</span></div>
+          </div>
+          <div class="sparkline" id="sparkline" role="img" aria-label="Registros por intervalo"></div>
+          <div class="sparkline-axis mono"><span id="spark-start">hace 24 h</span><span id="spark-middle">hace 12 h</span><span>ahora</span></div>
+        </section>
+
+        <section class="toolbar" aria-label="Filtros de consulta">
+          <div class="segmented periods" role="group" aria-label="Período">
+            <button data-hours="1" aria-pressed="false">Última hora</button
+            ><button data-hours="24" aria-pressed="true">24 horas</button
+            ><button data-hours="168" aria-pressed="false">7 días</button>
+          </div>
+          <div class="filter-fields">
+            <label>Fuente
+              <select id="source">
+                <option value="all">Ambas</option>
+                <option value="up">Geociencias UP</option>
+                <option value="usgs">USGS</option>
+              </select></label
+            ><label>Radio
+              <select id="radius">
+                <option value="100">100 km</option>
+                <option value="300">300 km</option>
+                <option value="500">500 km</option>
+                <option value="1000" selected>1.000 km</option>
+                <option value="2000">2.000 km</option>
+              </select></label
+            ><label>Magnitud
+              <select id="min-mag">
+                <option value="0">Todas</option>
+                <option value="3">M 3+</option>
+                <option value="4">M 4+</option>
+                <option value="5">M 5+</option>
+                <option value="6">M 6+</option>
+              </select></label>
+          </div>
+        </section>
+
+        <details class="source-strip">
+          <summary>Estado de las fuentes</summary>
+          <span id="source-up">Geociencias UP: consultando…</span
+          ><span id="source-usgs">USGS: consultando…</span>
+          <p id="count-note">
+            Un sismo puede tener un registro en cada fuente. Los conteos son registros, no sismos únicos.
+          </p>
+        </details>
+        <div class="notice" id="notice" role="status" hidden></div>
+
+        <div class="list-heading">
+          <div>
+            <h2>Registros <span id="event-count" class="count">—</span></h2>
+            <p id="list-subtitle">Buscando en un radio de 1.000 km</p>
+          </div>
+          <label class="sort-label">Ordenar
+            <select id="sort">
+              <option value="time">Más recientes</option>
+              <option value="distance">Más cercanos</option>
+              <option value="mag">Mayor magnitud</option>
+            </select></label>
+        </div>
+        <div id="events" class="events">
+          <p class="empty">Consultando USGS y Geociencias UP…</p>
+        </div>
+
+        <footer class="panel-footer">
+          <div class="panel-actions">
+            <button id="activity-button">Actividad</button
+            ><button id="about-button">Cómo leer el panel</button
+            ><button id="install" hidden>Instalar app</button>
+          </div>
+          <div class="footnote">
+            <span id="countdown">Actualización cada 30 s</span>
+            <span id="updated" hidden>Esperando primera consulta</span>
+            <p>Hora de Panamá (UTC−5). Las fuentes pueden publicar con retraso y revisar valores. Este panel no es una alerta temprana.</p>
+            <div class="footnote-links">
+              <a href="https://earthquake.usgs.gov/earthquakes/map/" target="_blank" rel="noopener noreferrer">USGS</a
+              ><a href="https://sismosgeociencias.up.ac.pa/" target="_blank" rel="noopener noreferrer">Geociencias UP</a
+              ><span class="powered">Powered by: <a href="https://xyzsolutions.tech" target="_blank" rel="noopener noreferrer">xyzsolutions.tech</a></span>
+            </div>
+          </div>
+        </footer>
+      </aside>
+    </main>
+
+    <dialog id="activity-dialog">
+      <div class="dialog-heading">
+        <h2>Actividad en tu zona</h2>
+        <button id="close-activity" aria-label="Cerrar gráfica">×</button>
+      </div>
+      <section class="activity" aria-labelledby="activity-title">
+        <div class="activity-heading">
+          <div>
+            <h2 id="activity-title">El ritmo de la actividad</h2>
+            <p id="activity-subtitle">Registros por hora dentro de tu consulta</p>
+          </div>
+          <div class="activity-summary">
+            <strong id="last-hour">—</strong><span>registros en la última hora</span>
+          </div>
+        </div>
+        <div class="chart" id="chart" role="img" aria-label="Gráfica de actividad sísmica"></div>
+        <div class="chart-axis">
+          <span id="chart-start">Hace 24 horas</span><span id="chart-middle">Hace 12 horas</span><span>Ahora</span>
+        </div>
+      </section>
+    </dialog>
+    <dialog id="about">
+      <div class="dialog-heading">
+        <h2>Entender lo que ves</h2>
+        <button id="close-about" aria-label="Cerrar explicación">×</button>
+      </div>
+      <div class="explanation">
+        <article>
+          <span class="explain-symbol">M</span>
+          <div>
+            <h3>Magnitud: el tamaño del sismo</h3>
+            <p>
+              Los sismómetros registran el movimiento del suelo. Con los registros de varias estaciones se calculan
+              ubicación, profundidad y magnitud. Cada unidad de magnitud equivale aproximadamente a 32 veces más energía:
+              un M 6 libera unas 32 veces la energía de un M 5.
+            </p>
+          </div>
+        </article>
+        <article>
+          <span class="explain-symbol">◎</span>
+          <div>
+            <h3>Puntos y anillos</h3>
+            <p>
+              Cada punto es un epicentro; su tamaño y color indican magnitud. El círculo es un registro de Geociencias UP
+              y el rombo, de USGS. El anillo que se expande desde cada punto representa la energía relativa del sismo: no
+              es un área de daños ni de intensidad. Puedes apagarlos con el control «Ondas».
+            </p>
+          </div>
+        </article>
+        <article>
+          <span class="explain-symbol">≋</span>
+          <div>
+            <h3>Ondas P y S hacia tu ubicación</h3>
+            <p>
+              Al seleccionar un sismo, el mapa repite cómo viajaron sus ondas: la onda P (primaria, discontinua) llega
+              primero y la onda S (secundaria, sólida), más lenta y normalmente más fuerte, después. Se usan velocidades
+              medias de corteza, 6,0 km/s y 3,5 km/s, y la distancia al hipocentro; los tiempos reales varían con la
+              geología y la trayectoria.
+            </p>
+            <p>
+              Es una repetición: los catálogos publican minutos después, cuando las ondas ya pasaron. No es una cuenta
+              regresiva ni una alerta.
+            </p>
+          </div>
+        </article>
+        <article>
+          <span class="explain-symbol">⌖</span>
+          <div>
+            <h3>Distancia y profundidad</h3>
+            <p>
+              La distancia es sobre la superficie, desde tu ubicación o desde el centro de Panamá. La profundidad indica
+              dónde ocurrió la ruptura bajo la superficie.
+            </p>
+          </div>
+        </article>
+        <article>
+          <span class="explain-symbol">≈</span>
+          <div>
+            <h3>Intensidad: cómo se sintió en un lugar</h3>
+            <p>
+              La intensidad varía con la distancia, la profundidad, el suelo y otros factores. La escala de Mercalli
+              modificada va de I a XII. El panel no estima la intensidad en tu casa a partir de la magnitud.
+            </p>
+          </div>
+        </article>
+        <article>
+          <span class="explain-symbol">↻</span>
+          <div>
+            <h3>Cómo se comporta y de dónde sale</h3>
+            <p>
+              Después de un sismo grande pueden aparecer réplicas; su frecuencia suele disminuir con el tiempo. Esto no
+              permite predecir el próximo evento. Se consultan el feed GeoJSON de USGS y el listado oficial de
+              Geociencias UP cada 30 segundos mientras el panel está abierto; un navegador en segundo plano puede
+              espaciar o pausar las consultas. Con los avisos activados, cada registro nuevo dentro de tus filtros
+              genera una notificación local en este dispositivo; no hay un servidor que envíe alertas con el panel
+              cerrado.
+            </p>
+            <p>
+              Las fuentes pueden publicar con retraso, revisar valores o retirar registros. Geociencias UP usa hora local
+              de Panamá y distingue registros preliminares y revisados. El panel muestra la hora de consulta de cada
+              fuente; UP no publica una hora de generación del listado.
+            </p>
+            <p>
+              «Nuevo» significa un registro incorporado desde la consulta anterior, aunque el sismo haya ocurrido antes.
+              Un mismo sismo puede tener registros con distintas magnitudes y ubicaciones en cada fuente; la ficha
+              muestra el registro de la otra fuente cuando coincide en hora y lugar. Al ver ambas, se cuentan registros
+              publicados, sin asumir que sean sismos distintos.
+            </p>
+          </div>
+        </article>
+        <p class="privacy">
+          Tu ubicación solo se usa en este navegador para dibujar tu punto, calcular distancias y filtrar el catálogo.
+          No se guarda ni se envía a los catálogos. Si ya diste permiso, el panel la pide al abrirse. El mapa se carga
+          desde Google Maps cuando hay una clave configurada; en caso contrario se usa Esri. El proveedor del mapa recibe
+          las solicitudes necesarias para mostrar la zona visible.
+        </p>
+        <div class="source-links">
+          <a href="https://www.usgs.gov/programs/earthquake-hazards/earthquake-magnitude-energy-release-and-shaking-intensity" target="_blank" rel="noopener noreferrer">Magnitud e intensidad · USGS</a
+          ><a href="https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php" target="_blank" rel="noopener noreferrer">Fuente y formato del catálogo</a
+          ><a href="https://earthquake.usgs.gov/data/products/oaf/overview.php" target="_blank" rel="noopener noreferrer">Comportamiento de las réplicas</a
+          ><a href="https://sismosgeociencias.up.ac.pa/" target="_blank" rel="noopener noreferrer">Listado oficial de Geociencias UP</a>
+        </div>
+      </div>
+    </dialog>
+  </body>
+</html>
