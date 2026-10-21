@@ -2,6 +2,13 @@
   "name": "sismos-pma-cron",
   "private": true,
   "type": "module",
-  "scripts": { "deploy": "wrangler deploy" },
-  "devDependencies": { "wrangler": "4.149.0" }
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  },
+  "engines": {
+    "node": ">=22.23.4 <23"
+  }
 }
